@@ -12,6 +12,8 @@
 use linked_hash_map::LinkedHashMap;
 #[cfg(not(feature = "preserve_order"))]
 use std::collections::BTreeMap;
+use std::fmt::Debug;
+use std::hash::Hash;
 
 #[cfg(not(feature = "preserve_order"))]
 type MapImpl<K, V> = BTreeMap<K, V>;
@@ -20,5 +22,5 @@ type MapImpl<K, V> = BTreeMap<K, V>;
 type MapImpl<K, V> = LinkedHashMap<K, V>;
 
 /// Represents a JSON key/value type.
-#[derive(Debug, Clone, PartialEq)]
-pub struct Map<K, V>(MapImpl<K, V>);
+#[derive(Debug, Clone, Hash, Eq, PartialEq)]
+pub struct Map<K: Hash + Debug + Eq + PartialEq, V>(MapImpl<K, V>);

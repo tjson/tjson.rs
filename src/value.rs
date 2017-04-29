@@ -7,7 +7,7 @@ pub use number::Number;
 pub use set::Set;
 
 /// Represents any valid TJSON value.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Clone, Debug, Hash, Eq, PartialEq)]
 pub enum Value {
     /// Represents a TJSON boolean.
     Bool(bool),

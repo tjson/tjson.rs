@@ -1,7 +1,9 @@
 //! Number types available in TJSON
 
+use ordered_float::OrderedFloat;
+
 /// Represents a TJSON number: either signed int, unsigned int, or float
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, Hash, Eq, PartialEq)]
 pub enum Number {
     /// Signed integer (not necessarily less than zero).
     Int(i64),
@@ -10,5 +12,5 @@ pub enum Number {
     UInt(u64),
 
     /// Floating point (always finite).
-    Float(f64),
+    Float(OrderedFloat<f64>),
 }

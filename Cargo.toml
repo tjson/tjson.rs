@@ -21,6 +21,10 @@ features = ["serde"]
 version = "^0.4"
 optional = true
 
+[dependencies.ordered-float]
+version = "^0.4"
+features = ["serde"]
+
 [features]
 default = []
 

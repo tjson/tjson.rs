@@ -62,7 +62,11 @@
 #![deny(unsafe_code, unstable_features, unused_import_braces, unused_qualifications)]
 
 extern crate chrono;
+extern crate ordered_float;
 extern crate serde;
+
+#[cfg(feature = "preserve_order")]
+extern crate linked_hash_map;
 
 pub mod map;
 pub mod number;

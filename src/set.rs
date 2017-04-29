@@ -12,6 +12,8 @@
 use linked_hash_map::LinkedHashMap;
 #[cfg(not(feature = "preserve_order"))]
 use std::collections::BTreeSet;
+use std::fmt::Debug;
+use std::hash::Hash;
 
 #[cfg(not(feature = "preserve_order"))]
 type SetImpl<T> = BTreeSet<T>;
@@ -20,5 +22,5 @@ type SetImpl<T> = BTreeSet<T>;
 type SetImpl<T> = LinkedHashMap<T, ()>;
 
 /// Represents a JSON key/value type.
-#[derive(Debug, Clone, PartialEq)]
-pub struct Set<T>(SetImpl<T>);
+#[derive(Debug, Clone, Hash, Eq, PartialEq)]
+pub struct Set<T: Hash + Debug + Eq + PartialEq>(SetImpl<T>);
