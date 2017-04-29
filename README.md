@@ -26,6 +26,7 @@ data types by supplying a type "tag" embedded in object member names:
 [docs-image]: https://docs.rs/tjson/badge.svg
 [docs-link]: https://docs.rs/tjson/
 [build-image]: https://travis-ci.org/tjson/tjson-rust.svg?branch=master
+[build-link]: https://travis-ci.org/tjson/tjson-rust
 [license-image]: https://img.shields.io/badge/license-MIT-blue.svg
 [license-link]: https://github.com/tjson/tjson-rust/blob/master/LICENSE.txt
 [TJSON]: https://www.tjson.org/
