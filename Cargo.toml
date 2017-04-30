@@ -5,7 +5,30 @@ version     = "0.0.0"
 license     = "MIT"
 authors     = ["Tony Arcieri <bascule@gmail.com>"]
 homepage    = "https://www.tjson.org"
-repository  = "https://github.com/tjson/tjson-rs"
+repository  = "https://github.com/tjson/tjson-rust"
 readme      = "README.md"
 categories  = ["encoding"]
 keywords    = ["encoding", "json", "serialization", "serde"]
+
+[dependencies]
+serde = "^1.0"
+
+[dependencies.chrono]
+version = "^0.3"
+features = ["serde"]
+
+[dependencies.linked-hash-map]
+version = "^0.4"
+optional = true
+
+[dependencies.ordered-float]
+version = "^0.4"
+features = ["serde"]
+
+[features]
+default = []
+
+# Use LinkedHashMap rather than BTreeMap as the underlying implementation of
+# the Map and Set types used by tjson::Value. This allows data to be read into
+# a Value and written back while preserving the original element ordering.
+preserve_order = ["linked-hash-map"]
