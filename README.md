@@ -62,5 +62,6 @@ project: Copyright 2017 Serde Developers. Licensed under either of:
 
 at your option.
 
+[Serde JSON]: https://github.com/serde-rs/json
 [LICENSE-APACHE]: https://github.com/tjson/tjson-rust/blob/master/LICENSE-APACHE
 [LICENSE-MIT]: https://github.com/tjson/tjson-rust/blob/master/LICENSE-MIT
