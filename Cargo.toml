@@ -11,6 +11,8 @@ categories  = ["encoding"]
 keywords    = ["encoding", "json", "serialization", "serde"]
 
 [dependencies]
+itoa = "^0.3"
+dtoa = "^0.4"
 serde = "^1.0"
 
 [dependencies.chrono]
