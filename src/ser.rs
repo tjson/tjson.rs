@@ -8,16 +8,14 @@
 
 //! Serialize a Rust data structure into JSON data.
 
+use super::error::{Error, ErrorCode, Result};
+use dtoa;
+use itoa;
+use serde::ser::{self, Impossible};
 use std::fmt;
 use std::io;
 use std::num::FpCategory;
 use std::str;
-
-use serde::ser::{self, Impossible};
-use super::error::{Error, ErrorCode, Result};
-
-use itoa;
-use dtoa;
 
 /// A structure for serializing Rust values into JSON.
 pub struct Serializer<W, F = CompactFormatter> {

@@ -20,11 +20,14 @@ impl Serialize for Value {
         S: ::serde::Serializer,
     {
         match *self {
-            Value::Null => serializer.serialize_unit(),
+            Value::Undefined => serializer.serialize_unit(),
             Value::Bool(b) => serializer.serialize_bool(b),
+            Value::Data(ref d) => serializer.serialize_bytes(d),
             Value::Number(ref n) => n.serialize(serializer),
             Value::String(ref s) => serializer.serialize_str(s),
+            Value::Timestamp(ref t) => serializer.serialize_str(&t.to_rfc3339()),
             Value::Array(ref v) => v.serialize(serializer),
+            Value::Set(ref s) => s.serialize(serializer),
             Value::Object(ref m) => {
                 use serde::ser::SerializeMap;
                 let mut map = try!(serializer.serialize_map(Some(m.len())));
@@ -103,7 +106,7 @@ impl serde::Serializer for Serializer {
 
     #[inline]
     fn serialize_f64(self, value: f64) -> Result<Value, Error> {
-        Ok(Number::from_f64(value).map_or(Value::Null, Value::Number))
+        Ok(Number::from_f64(value).map_or(Value::Undefined, Value::Number),)
     }
 
     #[inline]
@@ -119,13 +122,12 @@ impl serde::Serializer for Serializer {
     }
 
     fn serialize_bytes(self, value: &[u8]) -> Result<Value, Error> {
-        let vec = value.iter().map(|&b| Value::Number(b.into())).collect();
-        Ok(Value::Array(vec))
+        Ok(Value::Data(value.to_owned()))
     }
 
     #[inline]
     fn serialize_unit(self) -> Result<Value, Error> {
-        Ok(Value::Null)
+        Ok(Value::Undefined)
     }
 
     #[inline]

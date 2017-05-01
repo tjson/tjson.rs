@@ -20,7 +20,7 @@ extern crate serde_derive;
 extern crate serde;
 extern crate serde_bytes;
 #[macro_use]
-extern crate serde_json;
+extern crate tjson;
 
 #[macro_use]
 mod macros;
@@ -39,8 +39,8 @@ use serde::ser::{self, Serialize, Serializer};
 
 use serde_bytes::{ByteBuf, Bytes};
 
-use serde_json::{Deserializer, Value, from_reader, from_slice, from_str, from_value,
-                 to_string, to_string_pretty, to_value, to_vec, to_writer};
+use tjson::{Deserializer, Value, from_reader, from_slice, from_str, from_value, to_string,
+            to_string_pretty, to_value, to_vec, to_writer};
 
 macro_rules! treemap {
     () => {
@@ -154,16 +154,16 @@ fn test_write_f64() {
 #[test]
 fn test_encode_nonfinite_float_yields_null() {
     let v = to_value(::std::f64::NAN).unwrap();
-    assert!(v.is_null());
+    assert!(v.is_undefined());
 
     let v = to_value(::std::f64::INFINITY).unwrap();
-    assert!(v.is_null());
+    assert!(v.is_undefined());
 
     let v = to_value(::std::f32::NAN).unwrap();
-    assert!(v.is_null());
+    assert!(v.is_undefined());
 
     let v = to_value(::std::f32::INFINITY).unwrap();
-    assert!(v.is_null());
+    assert!(v.is_undefined());
 }
 
 #[test]
@@ -235,7 +235,7 @@ fn test_write_list() {
         ],
     );
 
-    let long_test_list = json!([false, null, ["foo\nbar", 3.5]]);
+    let long_test_list = tjson!([false, null, ["foo\nbar", 3.5]]);
 
     test_encode_ok(
         &[
@@ -410,7 +410,7 @@ fn test_write_object() {
         ],
     );
 
-    let complex_obj = json!({
+    let complex_obj = tjson!({
         "b": [
             {"c": "\x0c\x1f\r"},
             {"d": ""}
@@ -1200,10 +1200,10 @@ fn test_missing_option_field() {
     let value: Foo = from_str("{\"x\": 5}").unwrap();
     assert_eq!(value, Foo { x: Some(5) });
 
-    let value: Foo = from_value(json!({})).unwrap();
+    let value: Foo = from_value(tjson!({})).unwrap();
     assert_eq!(value, Foo { x: None });
 
-    let value: Foo = from_value(json!({"x": 5})).unwrap();
+    let value: Foo = from_value(tjson!({"x": 5})).unwrap();
     assert_eq!(value, Foo { x: Some(5) });
 }
 
@@ -1231,10 +1231,10 @@ fn test_missing_renamed_field() {
     let value: Foo = from_str("{\"y\": 5}").unwrap();
     assert_eq!(value, Foo { x: Some(5) });
 
-    let value: Foo = from_value(json!({})).unwrap();
+    let value: Foo = from_value(tjson!({})).unwrap();
     assert_eq!(value, Foo { x: None });
 
-    let value: Foo = from_value(json!({"y": 5})).unwrap();
+    let value: Foo = from_value(tjson!({"y": 5})).unwrap();
     assert_eq!(value, Foo { x: Some(5) });
 }
 
@@ -1535,17 +1535,17 @@ fn test_json_pointer() {
     )
             .unwrap();
     assert_eq!(data.pointer("").unwrap(), &data);
-    assert_eq!(data.pointer("/foo").unwrap(), &json!(["bar", "baz"]));
-    assert_eq!(data.pointer("/foo/0").unwrap(), &json!("bar"));
-    assert_eq!(data.pointer("/").unwrap(), &json!(0));
-    assert_eq!(data.pointer("/a~1b").unwrap(), &json!(1));
-    assert_eq!(data.pointer("/c%d").unwrap(), &json!(2));
-    assert_eq!(data.pointer("/e^f").unwrap(), &json!(3));
-    assert_eq!(data.pointer("/g|h").unwrap(), &json!(4));
-    assert_eq!(data.pointer("/i\\j").unwrap(), &json!(5));
-    assert_eq!(data.pointer("/k\"l").unwrap(), &json!(6));
-    assert_eq!(data.pointer("/ ").unwrap(), &json!(7));
-    assert_eq!(data.pointer("/m~0n").unwrap(), &json!(8));
+    assert_eq!(data.pointer("/foo").unwrap(), &tjson!(["bar", "baz"]));
+    assert_eq!(data.pointer("/foo/0").unwrap(), &tjson!("bar"));
+    assert_eq!(data.pointer("/").unwrap(), &tjson!(0));
+    assert_eq!(data.pointer("/a~1b").unwrap(), &tjson!(1));
+    assert_eq!(data.pointer("/c%d").unwrap(), &tjson!(2));
+    assert_eq!(data.pointer("/e^f").unwrap(), &tjson!(3));
+    assert_eq!(data.pointer("/g|h").unwrap(), &tjson!(4));
+    assert_eq!(data.pointer("/i\\j").unwrap(), &tjson!(5));
+    assert_eq!(data.pointer("/k\"l").unwrap(), &tjson!(6));
+    assert_eq!(data.pointer("/ ").unwrap(), &tjson!(7));
+    assert_eq!(data.pointer("/m~0n").unwrap(), &tjson!(8));
     // Invalid pointers
     assert!(data.pointer("/unknown").is_none());
     assert!(data.pointer("/e^f/ertz").is_none());
@@ -1575,8 +1575,8 @@ fn test_json_pointer_mut() {
             .unwrap();
 
     // Basic pointer checks
-    assert_eq!(data.pointer_mut("/foo").unwrap(), &json!(["bar", "baz"]));
-    assert_eq!(data.pointer_mut("/foo/0").unwrap(), &json!("bar"));
+    assert_eq!(data.pointer_mut("/foo").unwrap(), &tjson!(["bar", "baz"]));
+    assert_eq!(data.pointer_mut("/foo/0").unwrap(), &tjson!("bar"));
     assert_eq!(data.pointer_mut("/").unwrap(), 0);
     assert_eq!(data.pointer_mut("/a~1b").unwrap(), 1);
     assert_eq!(data.pointer_mut("/c%d").unwrap(), 2);
@@ -1596,12 +1596,12 @@ fn test_json_pointer_mut() {
     // Mutable pointer checks
     *data.pointer_mut("/").unwrap() = 100.into();
     assert_eq!(data.pointer("/").unwrap(), 100);
-    *data.pointer_mut("/foo/0").unwrap() = json!("buzz");
-    assert_eq!(data.pointer("/foo/0").unwrap(), &json!("buzz"));
+    *data.pointer_mut("/foo/0").unwrap() = tjson!("buzz");
+    assert_eq!(data.pointer("/foo/0").unwrap(), &tjson!("buzz"));
 
     // Example of ownership stealing
-    assert_eq!(data.pointer_mut("/a~1b").map(|m| mem::replace(m, json!(null))).unwrap(), 1);
-    assert_eq!(data.pointer("/a~1b").unwrap(), &json!(null));
+    assert_eq!(data.pointer_mut("/a~1b").map(|m| mem::replace(m, tjson!(null))).unwrap(), 1);
+    assert_eq!(data.pointer("/a~1b").unwrap(), &tjson!(null));
 
     // Need to compare against a clone so we don't anger the borrow checker
     // by taking out two references to a mutable value
@@ -1655,7 +1655,7 @@ fn test_deny_float_key() {
 
     // map with float key
     let map = treemap!(Float => "x");
-    assert!(serde_json::to_value(&map).is_err());
+    assert!(tjson::to_value(&map).is_err());
 }
 
 #[test]
@@ -1702,19 +1702,19 @@ fn test_effectively_string_keys() {
 fn test_json_macro() {
     // This is tricky because the <...> is not a single TT and the comma inside
     // looks like an array element separator.
-    let _ = json!([
+    let _ = tjson!([
         <Result<(), ()> as Clone>::clone(&Ok(())),
         <Result<(), ()> as Clone>::clone(&Err(()))
     ]);
 
     // Same thing but in the map values.
-    let _ = json!({
+    let _ = tjson!({
         "ok": <Result<(), ()> as Clone>::clone(&Ok(())),
         "err": <Result<(), ()> as Clone>::clone(&Err(()))
     });
 
     // It works in map keys but only if they are parenthesized.
-    let _ = json!({
+    let _ = tjson!({
         (<Result<&str, ()> as Clone>::clone(&Ok("")).unwrap()): "ok",
         (<Result<(), &str> as Clone>::clone(&Err("")).unwrap_err()): "err"
     });

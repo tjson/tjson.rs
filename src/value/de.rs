@@ -6,6 +6,7 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
+use set::{self, Set};
 use std::borrow::Cow;
 use std::fmt;
 use std::i64;
@@ -64,7 +65,7 @@ impl<'de> Deserialize<'de> for Value {
 
             #[inline]
             fn visit_f64<E>(self, value: f64) -> Result<Value, E> {
-                Ok(Number::from_f64(value).map_or(Value::Null, Value::Number))
+                Ok(Number::from_f64(value).map_or(Value::Undefined, Value::Number),)
             }
 
             #[inline]
@@ -82,7 +83,7 @@ impl<'de> Deserialize<'de> for Value {
 
             #[inline]
             fn visit_none<E>(self) -> Result<Value, E> {
-                Ok(Value::Null)
+                Ok(Value::Undefined)
             }
 
             #[inline]
@@ -95,7 +96,7 @@ impl<'de> Deserialize<'de> for Value {
 
             #[inline]
             fn visit_unit<E>(self) -> Result<Value, E> {
-                Ok(Value::Null)
+                Ok(Value::Undefined)
             }
 
             #[inline]
@@ -156,10 +157,10 @@ impl fmt::Display for Value {
     ///
     /// ```rust
     /// # #[macro_use]
-    /// # extern crate serde_json;
+    /// # extern crate tjson;
     /// #
     /// # fn main() {
-    /// let json = json!({ "city": "London", "street": "10 Downing Street" });
+    /// let json = tjson!({ "city": "London", "street": "10 Downing Street" });
     ///
     /// // Compact format:
     /// //
@@ -208,10 +209,13 @@ impl<'de> serde::Deserializer<'de> for Value {
         V: Visitor<'de>,
     {
         match self {
-            Value::Null => visitor.visit_unit(),
+            Value::Undefined => visitor.visit_unit(),
             Value::Bool(v) => visitor.visit_bool(v),
+            Value::Data(d) => visitor.visit_bytes(d.as_slice()),
             Value::Number(n) => n.deserialize_any(visitor),
             Value::String(v) => visitor.visit_string(v),
+            // TODO(tarcieri): hax!
+            Value::Timestamp(t) => visitor.visit_string(t.to_rfc3339()),
             Value::Array(v) => {
                 let len = v.len();
                 let mut deserializer = SeqDeserializer::new(v);
@@ -220,7 +224,20 @@ impl<'de> serde::Deserializer<'de> for Value {
                 if remaining == 0 {
                     Ok(seq)
                 } else {
-                    Err(serde::de::Error::invalid_length(len, &"fewer elements in array"))
+                    Err(serde::de::Error::invalid_length(len, &"fewer elements in array"),)
+                }
+            }
+            Value::Set(v) => {
+                let len = v.len();
+
+                // TODO: avoid allocating here, possibly with a SetDeserializer
+                let mut deserializer = SeqDeserializer::new(v.into_iter().collect());
+                let seq = try!(visitor.visit_seq(&mut deserializer));
+                let remaining = deserializer.iter.len();
+                if remaining == 0 {
+                    Ok(seq)
+                } else {
+                    Err(serde::de::Error::invalid_length(len, &"fewer elements in set"),)
                 }
             }
             Value::Object(v) => {
@@ -231,7 +248,7 @@ impl<'de> serde::Deserializer<'de> for Value {
                 if remaining == 0 {
                     Ok(map)
                 } else {
-                    Err(serde::de::Error::invalid_length(len, &"fewer elements in map"))
+                    Err(serde::de::Error::invalid_length(len, &"fewer elements in map"),)
                 }
             }
         }
@@ -243,7 +260,7 @@ impl<'de> serde::Deserializer<'de> for Value {
         V: Visitor<'de>,
     {
         match self {
-            Value::Null => visitor.visit_none(),
+            Value::Undefined => visitor.visit_none(),
             _ => visitor.visit_some(self),
         }
     }
@@ -274,7 +291,12 @@ impl<'de> serde::Deserializer<'de> for Value {
                 };
                 // enums are encoded in json as maps with a single key:value pair
                 if iter.next().is_some() {
-                    return Err(serde::de::Error::invalid_value(Unexpected::Map, &"map with a single key"),);
+                    return Err(
+                        serde::de::Error::invalid_value(
+                            Unexpected::Map,
+                            &"map with a single key",
+                        ),
+                    );
                 }
                 (variant, Some(value))
             }
@@ -379,7 +401,9 @@ impl<'de> VariantAccess<'de> for VariantDeserializer {
             Some(Value::Object(v)) => {
                 serde::Deserializer::deserialize_any(MapDeserializer::new(v), visitor)
             }
-            Some(other) => Err(serde::de::Error::invalid_type(other.unexpected(), &"struct variant"),),
+            Some(other) => {
+                Err(serde::de::Error::invalid_type(other.unexpected(), &"struct variant"),)
+            }
             _ => Err(serde::de::Error::invalid_type(Unexpected::UnitVariant, &"struct variant"),),
         }
     }
@@ -412,7 +436,7 @@ impl<'de> serde::Deserializer<'de> for SeqDeserializer {
             if remaining == 0 {
                 Ok(ret)
             } else {
-                Err(serde::de::Error::invalid_length(len, &"fewer elements in array"))
+                Err(serde::de::Error::invalid_length(len, &"fewer elements in array"),)
             }
         }
     }
@@ -520,10 +544,13 @@ impl<'de> serde::Deserializer<'de> for &'de Value {
         V: Visitor<'de>,
     {
         match *self {
-            Value::Null => visitor.visit_unit(),
+            Value::Undefined => visitor.visit_unit(),
             Value::Bool(v) => visitor.visit_bool(v),
+            Value::Data(ref d) => visitor.visit_borrowed_bytes(d),
             Value::Number(ref n) => n.deserialize_any(visitor),
             Value::String(ref v) => visitor.visit_borrowed_str(v),
+            // TODO(tarcieri): hax!
+            Value::Timestamp(ref _t) => visitor.visit_unit(),
             Value::Array(ref v) => {
                 let len = v.len();
                 let mut deserializer = SeqRefDeserializer::new(v);
@@ -532,7 +559,18 @@ impl<'de> serde::Deserializer<'de> for &'de Value {
                 if remaining == 0 {
                     Ok(seq)
                 } else {
-                    Err(serde::de::Error::invalid_length(len, &"fewer elements in array"))
+                    Err(serde::de::Error::invalid_length(len, &"fewer elements in array"),)
+                }
+            }
+            Value::Set(ref v) => {
+                let len = v.len();
+                let mut deserializer = SetRefDeserializer::new(v);
+                let seq = try!(visitor.visit_seq(&mut deserializer));
+                let remaining = deserializer.iter.len();
+                if remaining == 0 {
+                    Ok(seq)
+                } else {
+                    Err(serde::de::Error::invalid_length(len, &"fewer elements in set"),)
                 }
             }
             Value::Object(ref v) => {
@@ -543,7 +581,7 @@ impl<'de> serde::Deserializer<'de> for &'de Value {
                 if remaining == 0 {
                     Ok(map)
                 } else {
-                    Err(serde::de::Error::invalid_length(len, &"fewer elements in map"))
+                    Err(serde::de::Error::invalid_length(len, &"fewer elements in map"),)
                 }
             }
         }
@@ -554,7 +592,7 @@ impl<'de> serde::Deserializer<'de> for &'de Value {
         V: Visitor<'de>,
     {
         match *self {
-            Value::Null => visitor.visit_none(),
+            Value::Undefined => visitor.visit_none(),
             _ => visitor.visit_some(self),
         }
     }
@@ -584,7 +622,12 @@ impl<'de> serde::Deserializer<'de> for &'de Value {
                 };
                 // enums are encoded in json as maps with a single key:value pair
                 if iter.next().is_some() {
-                    return Err(serde::de::Error::invalid_value(Unexpected::Map, &"map with a single key"),);
+                    return Err(
+                        serde::de::Error::invalid_value(
+                            Unexpected::Map,
+                            &"map with a single key",
+                        ),
+                    );
                 }
                 (variant, Some(value))
             }
@@ -689,7 +732,9 @@ impl<'de> VariantAccess<'de> for VariantRefDeserializer<'de> {
             Some(&Value::Object(ref v)) => {
                 serde::Deserializer::deserialize_any(MapRefDeserializer::new(v), visitor)
             }
-            Some(other) => Err(serde::de::Error::invalid_type(other.unexpected(), &"struct variant"),),
+            Some(other) => {
+                Err(serde::de::Error::invalid_type(other.unexpected(), &"struct variant"),)
+            }
             _ => Err(serde::de::Error::invalid_type(Unexpected::UnitVariant, &"struct variant"),),
         }
     }
@@ -722,7 +767,7 @@ impl<'de> serde::Deserializer<'de> for SeqRefDeserializer<'de> {
             if remaining == 0 {
                 Ok(ret)
             } else {
-                Err(serde::de::Error::invalid_length(len, &"fewer elements in array"))
+                Err(serde::de::Error::invalid_length(len, &"fewer elements in array"),)
             }
         }
     }
@@ -740,6 +785,66 @@ impl<'de> SeqAccess<'de> for SeqRefDeserializer<'de> {
     fn next_element_seed<T>(&mut self, seed: T) -> Result<Option<T::Value>, Error>
     where
         T: DeserializeSeed<'de>,
+    {
+        match self.iter.next() {
+            Some(value) => seed.deserialize(value).map(Some),
+            None => Ok(None),
+        }
+    }
+
+    fn size_hint(&self) -> Option<usize> {
+        match self.iter.size_hint() {
+            (lower, Some(upper)) if lower == upper => Some(upper),
+            _ => None,
+        }
+    }
+}
+
+struct SetRefDeserializer<'de> {
+    iter: set::Iter<'de>,
+}
+
+impl<'de> SetRefDeserializer<'de> {
+    fn new(set: &'de Set<Value>) -> Self {
+        SetRefDeserializer { iter: set.iter() }
+    }
+}
+
+impl<'de> serde::Deserializer<'de> for SetRefDeserializer<'de> {
+    type Error = Error;
+
+    #[inline]
+    fn deserialize_any<V>(mut self, visitor: V) -> Result<V::Value, Error>
+        where
+            V: Visitor<'de>,
+    {
+        let len = self.iter.len();
+        if len == 0 {
+            visitor.visit_unit()
+        } else {
+            let ret = try!(visitor.visit_seq(&mut self));
+            let remaining = self.iter.len();
+            if remaining == 0 {
+                Ok(ret)
+            } else {
+                Err(serde::de::Error::invalid_length(len, &"fewer elements in set"),)
+            }
+        }
+    }
+
+    forward_to_deserialize_any! {
+        bool i8 i16 i32 i64 u8 u16 u32 u64 f32 f64 char str string bytes
+        byte_buf option unit unit_struct newtype_struct seq tuple
+        tuple_struct map struct enum identifier ignored_any
+    }
+}
+
+impl<'de> SeqAccess<'de> for SetRefDeserializer<'de> {
+    type Error = Error;
+
+    fn next_element_seed<T>(&mut self, seed: T) -> Result<Option<T::Value>, Error>
+        where
+            T: DeserializeSeed<'de>,
     {
         match self.iter.next() {
             Some(value) => seed.deserialize(value).map(Some),
@@ -870,7 +975,11 @@ impl<'de> serde::Deserializer<'de> for MapKeyDeserializer<'de> {
     }
 
     #[inline]
-    fn deserialize_newtype_struct<V>(self, _name: &'static str, visitor: V) -> Result<V::Value, Error>
+    fn deserialize_newtype_struct<V>(
+        self,
+        _name: &'static str,
+        visitor: V,
+    ) -> Result<V::Value, Error>
     where
         V: Visitor<'de>,
     {
@@ -886,7 +995,9 @@ impl<'de> serde::Deserializer<'de> for MapKeyDeserializer<'de> {
     where
         V: Visitor<'de>,
     {
-        self.key.into_deserializer().deserialize_enum(name, variants, visitor)
+        self.key
+            .into_deserializer()
+            .deserialize_enum(name, variants, visitor)
     }
 
     forward_to_deserialize_any! {
@@ -898,11 +1009,14 @@ impl<'de> serde::Deserializer<'de> for MapKeyDeserializer<'de> {
 impl Value {
     fn unexpected(&self) -> Unexpected {
         match *self {
-            Value::Null => Unexpected::Unit,
+            Value::Undefined => Unexpected::Unit,
             Value::Bool(b) => Unexpected::Bool(b),
+            Value::Data(ref d) => Unexpected::Bytes(d),
             Value::Number(ref n) => n.unexpected(),
             Value::String(ref s) => Unexpected::Str(s),
+            Value::Timestamp(_) => Unexpected::Other("timestamp"),
             Value::Array(_) => Unexpected::Seq,
+            Value::Set(_) => Unexpected::Seq,
             Value::Object(_) => Unexpected::Map,
         }
     }

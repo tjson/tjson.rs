@@ -1,3 +1,8 @@
+// Copyright 2017 Tony Arcieri
+//
+// Includes portions of code from the Serde JSON project:
+// https://github.com/serde-rs/json
+//
 // Copyright 2017 Serde Developers
 //
 // Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
@@ -12,11 +17,11 @@ use std::ops;
 use super::Value;
 use map::Map;
 
-/// A type that can be used to index into a `serde_json::Value`. See the `get`
+/// A type that can be used to index into a `tjson::Value`. See the `get`
 /// and `get_mut` methods of `Value`.
 ///
 /// This trait is sealed and cannot be implemented for types outside of
-/// `serde_json`.
+/// `tjson`.
 pub trait Index: private::Sealed {
     /// Return None if the key is not already in the array or object.
     #[doc(hidden)]
@@ -81,15 +86,13 @@ impl Index for str {
         }
     }
     fn index_or_insert<'v>(&self, v: &'v mut Value) -> &'v mut Value {
-        if let Value::Null = *v {
+        if let Value::Undefined = *v {
             let mut map = Map::new();
-            map.insert(self.to_owned(), Value::Null);
+            map.insert(self.to_owned(), Value::Undefined);
             *v = Value::Object(map);
         }
         match *v {
-            Value::Object(ref mut map) => {
-                map.entry(self.to_owned()).or_insert(Value::Null)
-            }
+            Value::Object(ref mut map) => map.entry(self.to_owned()).or_insert(Value::Undefined),
             _ => panic!("cannot access key {:?} in JSON {}", self, Type(v)),
         }
     }
@@ -141,11 +144,14 @@ struct Type<'a>(&'a Value);
 impl<'a> fmt::Display for Type<'a> {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         match *self.0 {
-            Value::Null => formatter.write_str("null"),
+            Value::Undefined => formatter.write_str("undefined"),
             Value::Bool(_) => formatter.write_str("boolean"),
+            Value::Data(_) => formatter.write_str("data"),
             Value::Number(_) => formatter.write_str("number"),
             Value::String(_) => formatter.write_str("string"),
+            Value::Timestamp(_) => formatter.write_str("timestamp"),
             Value::Array(_) => formatter.write_str("array"),
+            Value::Set(_) => formatter.write_str("set"),
             Value::Object(_) => formatter.write_str("object"),
         }
     }
@@ -176,12 +182,12 @@ where
 {
     type Output = Value;
 
-    /// Index into a `serde_json::Value` using the syntax `value[0]` or
+    /// Index into a `tjson::Value` using the syntax `value[0]` or
     /// `value["k"]`.
     ///
-    /// Returns `Value::Null` if the type of `self` does not match the type of
+    /// Returns `Value::Undefined` if the type of `self` does not match the type of
     /// the index, for example if the index is a string and `self` is an array
-    /// or a number. Also returns `Value::Null` if the given key does not exist
+    /// or a number. Also returns `Value::Undefined` if the given key does not exist
     /// in the map or the given index is not within the bounds of the array.
     ///
     /// For retrieving deeply nested values, you should have a look at the
@@ -191,25 +197,25 @@ where
     ///
     /// ```rust
     /// # #[macro_use]
-    /// # extern crate serde_json;
+    /// # extern crate tjson;
     /// #
     /// # fn main() {
-    /// let data = json!({
+    /// let data = tjson!({
     ///     "x": {
     ///         "y": ["z", "zz"]
     ///     }
     /// });
     ///
-    /// assert_eq!(data["x"]["y"], json!(["z", "zz"]));
-    /// assert_eq!(data["x"]["y"][0], json!("z"));
+    /// assert_eq!(data["x"]["y"], tjson!(["z", "zz"]));
+    /// assert_eq!(data["x"]["y"][0], tjson!("z"));
     ///
-    /// assert_eq!(data["a"], json!(null)); // returns null for undefined values
-    /// assert_eq!(data["a"]["b"], json!(null)); // does not panic
+    /// assert_eq!(data["a"], tjson!(null)); // returns null for undefined values
+    /// assert_eq!(data["a"]["b"], tjson!(null)); // does not panic
     /// # }
     /// ```
     fn index(&self, index: I) -> &Value {
-        static NULL: Value = Value::Null;
-        index.index_into(self).unwrap_or(&NULL)
+        static UNDEFINED: Value = Value::Undefined;
+        index.index_into(self).unwrap_or(&UNDEFINED)
     }
 }
 
@@ -217,7 +223,7 @@ impl<I> ops::IndexMut<I> for Value
 where
     I: Index,
 {
-    /// Write into a `serde_json::Value` using the syntax `value[0] = ...` or
+    /// Write into a `tjson::Value` using the syntax `value[0] = ...` or
     /// `value["k"] = ...`.
     ///
     /// If the index is a number, the value must be an array of length bigger
@@ -233,22 +239,22 @@ where
     ///
     /// ```rust
     /// # #[macro_use]
-    /// # extern crate serde_json;
+    /// # extern crate tjson;
     /// #
     /// # fn main() {
-    /// let mut data = json!({ "x": 0 });
+    /// let mut data = tjson!({ "x": 0 });
     ///
     /// // replace an existing key
-    /// data["x"] = json!(1);
+    /// data["x"] = tjson!(1);
     ///
     /// // insert a new key
-    /// data["y"] = json!([false, false, false]);
+    /// data["y"] = tjson!([false, false, false]);
     ///
     /// // replace an array value
-    /// data["y"][0] = json!(true);
+    /// data["y"][0] = tjson!(true);
     ///
     /// // inserted a deeply nested key
-    /// data["a"]["b"]["c"]["d"] = json!(true);
+    /// data["a"]["b"]["c"]["d"] = tjson!(true);
     ///
     /// println!("{}", data);
     /// # }

@@ -38,19 +38,28 @@
 #![crate_type = "lib"]
 #![doc(html_root_url = "https://docs.rs/tjson/")]
 
-#![deny(missing_docs, missing_debug_implementations, missing_copy_implementations)]
-#![deny(trivial_casts, trivial_numeric_casts)]
-#![deny(unsafe_code, unstable_features, unused_import_braces, unused_qualifications)]
+#![deny(missing_docs, unstable_features, unused_import_braces)]
 
 extern crate chrono;
 extern crate dtoa;
 extern crate itoa;
+extern crate num_traits;
 extern crate ordered_float;
 #[macro_use]
 extern crate serde;
 
 #[cfg(feature = "preserve_order")]
 extern crate linked_hash_map;
+
+#[doc(inline)]
+pub use self::de::{Deserializer, StreamDeserializer, from_reader, from_slice, from_str};
+#[doc(inline)]
+pub use self::error::{Error, Result};
+#[doc(inline)]
+pub use self::ser::{Serializer, to_string, to_string_pretty, to_vec, to_vec_pretty, to_writer,
+                    to_writer_pretty};
+#[doc(inline)]
+pub use self::value::{Map, Set, Number, Value, from_value, to_value};
 
 #[macro_use]
 mod macros;

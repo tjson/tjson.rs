@@ -13,16 +13,20 @@
 
 //! The Value enum, a loosely typed way of representing any valid TJSON value.
 
-use self::ser::Serializer;
-pub use chrono::datetime::DateTime;
-pub use chrono::offset::utc::UTC;
+use serde::ser::Serialize;
+use serde::de::DeserializeOwned;
+
 use error::Error;
 pub use map::Map;
-pub use number::Number;
-use serde::de::DeserializeOwned;
-use serde::ser::Serialize;
 pub use set::Set;
+pub use number::Number;
+
+pub use chrono::datetime::DateTime;
+pub use chrono::offset::utc::UTC;
+
 pub use self::index::Index;
+
+use self::ser::Serializer;
 
 /// Represents any valid TJSON value.
 #[derive(Clone, Debug, Hash, Eq, PartialEq, PartialOrd, Ord)]
@@ -629,9 +633,9 @@ impl Value {
         }
     }
 
-    /// Returns true if the `Value` is a Null. Returns false otherwise.
+    /// Returns true if the `Value` is Undefined. Returns false otherwise.
     ///
-    /// For any Value on which `is_null` returns true, `as_null` is guaranteed
+    /// For any Value on which `is_undefined` returns true, `as_undefined` is guaranteed
     /// to return `Some(())`.
     ///
     /// ```rust
@@ -641,17 +645,17 @@ impl Value {
     /// # fn main() {
     /// let v = tjson!({ "a": null, "b": false });
     ///
-    /// assert!(v["a"].is_null());
+    /// assert!(v["a"].is_undefined());
     ///
     /// // The boolean `false` is not null.
-    /// assert!(!v["b"].is_null());
+    /// assert!(!v["b"].is_undefined());
     /// # }
     /// ```
-    pub fn is_null(&self) -> bool {
-        self.as_null().is_some()
+    pub fn is_undefined(&self) -> bool {
+        self.as_undefined().is_some()
     }
 
-    /// If the `Value` is a Null, returns (). Returns None otherwise.
+    /// If the `Value` is Undefined, returns (). Returns None otherwise.
     ///
     /// ```rust
     /// # #[macro_use]
@@ -660,22 +664,22 @@ impl Value {
     /// # fn main() {
     /// let v = tjson!({ "a": null, "b": false });
     ///
-    /// assert_eq!(v["a"].as_null(), Some(()));
+    /// assert_eq!(v["a"].as_undefined(), Some(()));
     ///
     /// // The boolean `false` is not null.
-    /// assert_eq!(v["b"].as_null(), None);
+    /// assert_eq!(v["b"].as_undefined(), None);
     /// # }
     /// ```
-    pub fn as_null(&self) -> Option<()> {
+    pub fn as_undefined(&self) -> Option<()> {
         match *self {
             Value::Undefined => Some(()),
             _ => None,
         }
     }
 
-    /// Looks up a value by a TJSON Pointer.
+    /// Looks up a value by a JSON Pointer.
     ///
-    /// TJSON Pointer defines a string syntax for identifying a specific value
+    /// JSON Pointer defines a string syntax for identifying a specific value
     /// within a JavaScript Object Notation (JSON) document.
     ///
     /// A Pointer is a Unicode string with the reference tokens separated by `/`.
@@ -698,7 +702,7 @@ impl Value {
     ///     }
     /// });
     ///
-    /// assert_eq!(data.pointer("/x/y/1").unwrap(), &json!("zz"));
+    /// assert_eq!(data.pointer("/x/y/1").unwrap(), &tjson!("zz"));
     /// assert_eq!(data.pointer("/a/b/c"), None);
     /// # }
     /// ```
@@ -730,10 +734,10 @@ impl Value {
         Some(target)
     }
 
-    /// Looks up a value by a TJSON Pointer and returns a mutable reference to
+    /// Looks up a value by a JSON Pointer and returns a mutable reference to
     /// that value.
     ///
-    /// TJSON Pointer defines a string syntax for identifying a specific value
+    /// JSON Pointer defines a string syntax for identifying a specific value
     /// within a JavaScript Object Notation (JSON) document.
     ///
     /// A Pointer is a Unicode string with the reference tokens separated by `/`.

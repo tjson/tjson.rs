@@ -14,92 +14,195 @@
 //! Number types available in TJSON
 
 use error::Error;
+use num_traits::NumCast;
+use ordered_float::OrderedFloat;
 use serde::de::{self, Visitor, Unexpected};
 use serde::{Serialize, Serializer, Deserialize, Deserializer};
-use ordered_float::OrderedFloat;
 use std::fmt::{self, Debug, Display};
+use std::i64;
 
-/// Represents a TJSON number: either signed int, unsigned int, or float
+/// Represents a TJSON number, whether integer or floating point.
 #[derive(Copy, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Number {
     n: N,
 }
 
+// "N" is a prefix of "NegInt"... this is a false positive.
+// https://github.com/Manishearth/rust-clippy/issues/1241
+#[cfg_attr(feature = "cargo-clippy", allow(enum_variant_names))]
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
 enum N {
-    /// Signed integer (not necessarily less than zero).
-    Int(i64),
-
-    /// Unsigned integer
-    UInt(u64),
-
-    /// Floating point (always finite).
+    PosInt(u64),
+    /// Always less than zero.
+    NegInt(i64),
+    /// Always finite.
     Float(OrderedFloat<f64>),
 }
 
 impl Number {
-    /// Returns true if the `Number` is a signed integer.
-    // TODO: example code
+    /// Returns true if the `Number` is an integer between `i64::MIN` and
+    /// `i64::MAX`.
+    ///
+    /// For any Number on which `is_i64` returns true, `as_i64` is guaranteed to
+    /// return the integer value.
+    ///
+    /// ```rust
+    /// # #[macro_use]
+    /// # extern crate tjson;
+    /// #
+    /// # use std::i64;
+    /// #
+    /// # fn main() {
+    /// let big = i64::MAX as u64 + 10;
+    /// let v = tjson!({ "a": 64, "b": big, "c": 256.0 });
+    ///
+    /// assert!(v["a"].is_i64());
+    ///
+    /// // Greater than i64::MAX.
+    /// assert!(!v["b"].is_i64());
+    ///
+    /// // Numbers with a decimal point are not considered integers.
+    /// assert!(!v["c"].is_i64());
+    /// # }
+    /// ```
     #[inline]
     pub fn is_i64(&self) -> bool {
         match self.n {
-            N::UInt(_) | N::Float(_) => false,
-            N::Int(_) => true,
+            N::PosInt(v) => v <= i64::MAX as u64,
+            N::NegInt(_) => true,
+            N::Float(_) => false,
         }
     }
 
-    /// Returns true if the `Number` is an unsigned integer.
-    // TODO: example code
+    /// Returns true if the `Number` is an integer between zero and `u64::MAX`.
+    ///
+    /// For any Number on which `is_u64` returns true, `as_u64` is guaranteed to
+    /// return the integer value.
+    ///
+    /// ```rust
+    /// # #[macro_use]
+    /// # extern crate tjson;
+    /// #
+    /// # fn main() {
+    /// let v = tjson!({ "a": 64, "b": -64, "c": 256.0 });
+    ///
+    /// assert!(v["a"].is_u64());
+    ///
+    /// // Negative integer.
+    /// assert!(!v["b"].is_u64());
+    ///
+    /// // Numbers with a decimal point are not considered integers.
+    /// assert!(!v["c"].is_u64());
+    /// # }
+    /// ```
     #[inline]
     pub fn is_u64(&self) -> bool {
         match self.n {
-            N::UInt(_) => true,
-            N::Int(_) | N::Float(_) => false,
+            N::PosInt(_) => true,
+            N::NegInt(_) | N::Float(_) => false,
         }
     }
 
-    /// Returns true if the `Number` is a floating point.
-    // TODO: example code
+    /// Returns true if the `Number` can be represented by f64.
+    ///
+    /// For any Number on which `is_f64` returns true, `as_f64` is guaranteed to
+    /// return the floating point value.
+    ///
+    /// Currently this function returns true if and only if both `is_i64` and
+    /// `is_u64` return false but this is not a guarantee in the future.
+    ///
+    /// ```rust
+    /// # #[macro_use]
+    /// # extern crate tjson;
+    /// #
+    /// # fn main() {
+    /// let v = tjson!({ "a": 256.0, "b": 64, "c": -64 });
+    ///
+    /// assert!(v["a"].is_f64());
+    ///
+    /// // Integers.
+    /// assert!(!v["b"].is_f64());
+    /// assert!(!v["c"].is_f64());
+    /// # }
+    /// ```
     #[inline]
     pub fn is_f64(&self) -> bool {
         match self.n {
             N::Float(_) => true,
-            N::UInt(_) | N::Int(_) => false,
+            N::PosInt(_) | N::NegInt(_) => false,
         }
     }
 
-    /// If the `Number` is a signed integer, represent it as i64 if possible. Returns
+    /// If the `Number` is an integer, represent it as i64 if possible. Returns
     /// None otherwise.
-    // TODO: example code
+    ///
+    /// ```rust
+    /// # #[macro_use]
+    /// # extern crate tjson;
+    /// #
+    /// # use std::i64;
+    /// #
+    /// # fn main() {
+    /// let big = i64::MAX as u64 + 10;
+    /// let v = tjson!({ "a": 64, "b": big, "c": 256.0 });
+    ///
+    /// assert_eq!(v["a"].as_i64(), Some(64));
+    /// assert_eq!(v["b"].as_i64(), None);
+    /// assert_eq!(v["c"].as_i64(), None);
+    /// # }
+    /// ```
     #[inline]
     pub fn as_i64(&self) -> Option<i64> {
         match self.n {
-            N::UInt(n) => None,
-            N::Int(n) => Some(n),
+            N::PosInt(n) => NumCast::from(n),
+            N::NegInt(n) => Some(n),
             N::Float(_) => None,
         }
     }
 
-    /// If the `Number` is an unsigned integer, represent it as u64 if possible. Returns
+    /// If the `Number` is an integer, represent it as u64 if possible. Returns
     /// None otherwise.
-    // TODO: example code
+    ///
+    /// ```rust
+    /// # #[macro_use]
+    /// # extern crate tjson;
+    /// #
+    /// # fn main() {
+    /// let v = tjson!({ "a": 64, "b": -64, "c": 256.0 });
+    ///
+    /// assert_eq!(v["a"].as_u64(), Some(64));
+    /// assert_eq!(v["b"].as_u64(), None);
+    /// assert_eq!(v["c"].as_u64(), None);
+    /// # }
+    /// ```
     #[inline]
     pub fn as_u64(&self) -> Option<u64> {
         match self.n {
-            N::UInt(n) => Some(n),
-            N::Int(n) => None,
+            N::PosInt(n) => Some(n),
+            N::NegInt(n) => NumCast::from(n),
             N::Float(_) => None,
         }
     }
 
-    /// If the `Number` is a floating point, Represents the number as f64 if possible.
-    /// Returns None otherwise.
-    // TODO: example code
+    /// Represents the number as f64 if possible. Returns None otherwise.
+    ///
+    /// ```rust
+    /// # #[macro_use]
+    /// # extern crate tjson;
+    /// #
+    /// # fn main() {
+    /// let v = tjson!({ "a": 256.0, "b": 64, "c": -64 });
+    ///
+    /// assert_eq!(v["a"].as_f64(), Some(256.0));
+    /// assert_eq!(v["b"].as_f64(), Some(64.0));
+    /// assert_eq!(v["c"].as_f64(), Some(-64.0));
+    /// # }
+    /// ```
     #[inline]
     pub fn as_f64(&self) -> Option<f64> {
         match self.n {
-            N::UInt(n) => None,
-            N::Int(n) => None,
+            N::PosInt(n) => NumCast::from(n),
+            N::NegInt(n) => NumCast::from(n),
             N::Float(n) => Some(n.into()),
         }
     }
@@ -110,7 +213,7 @@ impl Number {
     /// ```rust
     /// # use std::f64;
     /// #
-    /// # use serde_json::Number;
+    /// # use tjson::Number;
     /// #
     /// assert!(Number::from_f64(256.0).is_some());
     ///
@@ -119,7 +222,7 @@ impl Number {
     #[inline]
     pub fn from_f64(f: f64) -> Option<Number> {
         if f.is_finite() {
-            Some(Number { n: N::Float(OrderedFloat::from(f)) })
+            Some(Number { n: N::Float(f.into()) })
         } else {
             None
         }
@@ -129,8 +232,8 @@ impl Number {
 impl fmt::Display for Number {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         match self.n {
-            N::UInt(i) => Display::fmt(&i, formatter),
-            N::Int(i) => Display::fmt(&i, formatter),
+            N::PosInt(i) => Display::fmt(&i, formatter),
+            N::NegInt(i) => Display::fmt(&i, formatter),
             N::Float(f) => Display::fmt(&f, formatter),
         }
     }
@@ -145,12 +248,12 @@ impl Debug for Number {
 impl Serialize for Number {
     #[inline]
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-        where
-            S: Serializer,
+    where
+        S: Serializer,
     {
         match self.n {
-            N::UInt(i) => serializer.serialize_u64(i),
-            N::Int(i) => serializer.serialize_i64(i),
+            N::PosInt(i) => serializer.serialize_u64(i),
+            N::NegInt(i) => serializer.serialize_i64(i),
             N::Float(f) => serializer.serialize_f64(f.into()),
         }
     }
@@ -159,8 +262,8 @@ impl Serialize for Number {
 impl<'de> Deserialize<'de> for Number {
     #[inline]
     fn deserialize<D>(deserializer: D) -> Result<Number, D::Error>
-        where
-            D: Deserializer<'de>,
+    where
+        D: Deserializer<'de>,
     {
         struct NumberVisitor;
 
@@ -183,8 +286,8 @@ impl<'de> Deserialize<'de> for Number {
 
             #[inline]
             fn visit_f64<E>(self, value: f64) -> Result<Number, E>
-                where
-                    E: de::Error,
+            where
+                E: de::Error,
             {
                 Number::from_f64(value).ok_or_else(|| de::Error::custom("not a JSON number"))
             }
@@ -199,12 +302,12 @@ impl<'de> Deserializer<'de> for Number {
 
     #[inline]
     fn deserialize_any<V>(self, visitor: V) -> Result<V::Value, Error>
-        where
-            V: Visitor<'de>,
+    where
+        V: Visitor<'de>,
     {
         match self.n {
-            N::UInt(i) => visitor.visit_u64(i),
-            N::Int(i) => visitor.visit_i64(i),
+            N::PosInt(i) => visitor.visit_u64(i),
+            N::NegInt(i) => visitor.visit_i64(i),
             N::Float(f) => visitor.visit_f64(f.into()),
         }
     }
@@ -221,12 +324,12 @@ impl<'de, 'a> Deserializer<'de> for &'a Number {
 
     #[inline]
     fn deserialize_any<V>(self, visitor: V) -> Result<V::Value, Error>
-        where
-            V: Visitor<'de>,
+    where
+        V: Visitor<'de>,
     {
         match self.n {
-            N::UInt(i) => visitor.visit_u64(i),
-            N::Int(i) => visitor.visit_i64(i),
+            N::PosInt(i) => visitor.visit_u64(i),
+            N::NegInt(i) => visitor.visit_i64(i),
             N::Float(f) => visitor.visit_f64(f.into()),
         }
     }
@@ -245,9 +348,9 @@ macro_rules! from_signed {
                 #[inline]
                 fn from(i: $signed_ty) -> Self {
                     if i < 0 {
-                        Number { n: N::Int(i as i64) }
+                        Number { n: N::NegInt(i as i64) }
                     } else {
-                        Number { n: N::UInt(i as u64) }
+                        Number { n: N::PosInt(i as u64) }
                     }
                 }
             }
@@ -261,7 +364,7 @@ macro_rules! from_unsigned {
             impl From<$unsigned_ty> for Number {
                 #[inline]
                 fn from(u: $unsigned_ty) -> Self {
-                    Number { n: N::UInt(u as u64) }
+                    Number { n: N::PosInt(u as u64) }
                 }
             }
         )*
@@ -276,8 +379,8 @@ impl Number {
     #[doc(hidden)]
     pub fn unexpected(&self) -> Unexpected {
         match self.n {
-            N::UInt(u) => Unexpected::Unsigned(u),
-            N::Int(i) => Unexpected::Signed(i),
+            N::PosInt(u) => Unexpected::Unsigned(u),
+            N::NegInt(i) => Unexpected::Signed(i),
             N::Float(f) => Unexpected::Float(f.into()),
         }
     }

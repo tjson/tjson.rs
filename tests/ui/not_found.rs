@@ -7,8 +7,8 @@
 // except according to those terms.
 
 #[macro_use]
-extern crate serde_json;
+extern crate tjson;
 
 fn main() {
-    json!({ "a" : x });
+    tjson!({ "a" : x });
 }

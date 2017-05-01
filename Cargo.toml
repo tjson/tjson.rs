@@ -2,7 +2,7 @@
 name        = "tjson"
 description = "Tagged JSON (TJSON) parser/serializer based on serde"
 version     = "0.0.0"
-license     = "MIT"
+license     = "MIT/Apache-2.0"
 authors     = ["Tony Arcieri <bascule@gmail.com>"]
 homepage    = "https://www.tjson.org"
 repository  = "https://github.com/tjson/tjson-rust"
@@ -10,13 +10,17 @@ readme      = "README.md"
 categories  = ["encoding"]
 keywords    = ["encoding", "json", "serialization", "serde"]
 
+[badges]
+travis-ci = { repository = "tjson/tjson-rust" }
+
 [dependencies]
 itoa = "^0.3"
 dtoa = "^0.4"
+num-traits = "0.1.32"
 serde = "^1.0"
 
 [dependencies.chrono]
-version = "^0.3"
+version = "^0.3.1"
 features = ["serde"]
 
 [dependencies.linked-hash-map]
@@ -26,6 +30,10 @@ optional = true
 [dependencies.ordered-float]
 version = "^0.4"
 features = ["serde"]
+
+[dev-dependencies]
+serde_bytes = "0.10"
+serde_derive = "1.0"
 
 [features]
 default = []

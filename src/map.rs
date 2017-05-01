@@ -36,12 +36,13 @@ use value::Value;
 
 /// Represents a JSON key/value type.
 #[derive(Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
-pub struct Map<K, V> {
+pub struct Map<K: Hash + Eq + PartialEq, V> {
     map: MapImpl<K, V>,
 }
 
 #[cfg(not(feature = "preserve_order"))]
 type MapImpl<K, V> = BTreeMap<K, V>;
+
 #[cfg(feature = "preserve_order")]
 type MapImpl<K, V> = LinkedHashMap<K, V>;
 
@@ -204,7 +205,7 @@ impl Default for Map<String, Value> {
 /// map.
 ///
 /// ```rust
-/// # use serde_json::Value;
+/// # use tjson::Value;
 /// #
 /// # let val = &Value::String("".to_owned());
 /// # let _ =
@@ -233,13 +234,13 @@ where
 ///
 /// ```rust
 /// # #[macro_use]
-/// # extern crate serde_json;
+/// # extern crate tjson;
 /// #
 /// # fn main() {
-/// #     let mut map = serde_json::Map::new();
-/// #     map.insert("key".to_owned(), serde_json::Value::Null);
+/// #     let mut map = tjson::Map::new();
+/// #     map.insert("key".to_owned(), tjson::Value::from(42));
 /// #
-/// map["key"] = json!("value");
+/// map["key"] = tjson!("value");
 /// # }
 /// ```
 impl<'a, Q: ?Sized> ops::IndexMut<&'a Q> for Map<String, Value>
@@ -409,7 +410,7 @@ impl<'a> Entry<'a> {
     /// # Examples
     ///
     /// ```rust
-    /// let mut map = serde_json::Map::new();
+    /// let mut map = tjson::Map::new();
     /// assert_eq!(map.entry("serde").key(), &"serde");
     /// ```
     pub fn key(&self) -> &String {
@@ -426,11 +427,11 @@ impl<'a> Entry<'a> {
     ///
     /// ```rust
     /// # #[macro_use]
-    /// # extern crate serde_json;
+    /// # extern crate tjson;
     /// #
     /// # fn main() {
-    /// let mut map = serde_json::Map::new();
-    /// map.entry("serde").or_insert(json!(12));
+    /// let mut map = tjson::Map::new();
+    /// map.entry("serde").or_insert(tjson!(12));
     ///
     /// assert_eq!(map["serde"], 12);
     /// # }
@@ -450,11 +451,11 @@ impl<'a> Entry<'a> {
     ///
     /// ```rust
     /// # #[macro_use]
-    /// # extern crate serde_json;
+    /// # extern crate tjson;
     /// #
     /// # fn main() {
-    /// let mut map = serde_json::Map::new();
-    /// map.entry("serde").or_insert_with(|| json!("hoho"));
+    /// let mut map = tjson::Map::new();
+    /// map.entry("serde").or_insert_with(|| tjson!("hoho"));
     ///
     /// assert_eq!(map["serde"], "hoho".to_owned());
     /// # }
@@ -477,9 +478,9 @@ impl<'a> VacantEntry<'a> {
     /// # Examples
     ///
     /// ```rust
-    /// use serde_json::map::Entry;
+    /// use tjson::map::Entry;
     ///
-    /// let mut map = serde_json::Map::new();
+    /// let mut map = tjson::Map::new();
     ///
     /// match map.entry("serde") {
     ///     Entry::Vacant(vacant) => {
@@ -500,16 +501,16 @@ impl<'a> VacantEntry<'a> {
     ///
     /// ```rust
     /// # #[macro_use]
-    /// # extern crate serde_json;
+    /// # extern crate tjson;
     /// #
     /// # fn main() {
-    /// use serde_json::map::Entry;
+    /// use tjson::map::Entry;
     ///
-    /// let mut map = serde_json::Map::new();
+    /// let mut map = tjson::Map::new();
     ///
     /// match map.entry("serde") {
     ///     Entry::Vacant(vacant) => {
-    ///         vacant.insert(json!("hoho"));
+    ///         vacant.insert(tjson!("hoho"));
     ///     }
     ///     Entry::Occupied(_) => unimplemented!(),
     /// }
@@ -528,13 +529,13 @@ impl<'a> OccupiedEntry<'a> {
     ///
     /// ```rust
     /// # #[macro_use]
-    /// # extern crate serde_json;
+    /// # extern crate tjson;
     /// #
     /// # fn main() {
-    /// use serde_json::map::Entry;
+    /// use tjson::map::Entry;
     ///
-    /// let mut map = serde_json::Map::new();
-    /// map.insert("serde".to_owned(), json!(12));
+    /// let mut map = tjson::Map::new();
+    /// map.insert("serde".to_owned(), tjson!(12));
     ///
     /// match map.entry("serde") {
     ///     Entry::Occupied(occupied) => {
@@ -555,13 +556,13 @@ impl<'a> OccupiedEntry<'a> {
     ///
     /// ```rust
     /// # #[macro_use]
-    /// # extern crate serde_json;
+    /// # extern crate tjson;
     /// #
     /// # fn main() {
-    /// use serde_json::map::Entry;
+    /// use tjson::map::Entry;
     ///
-    /// let mut map = serde_json::Map::new();
-    /// map.insert("serde".to_owned(), json!(12));
+    /// let mut map = tjson::Map::new();
+    /// map.insert("serde".to_owned(), tjson!(12));
     ///
     /// match map.entry("serde") {
     ///     Entry::Occupied(occupied) => {
@@ -582,17 +583,17 @@ impl<'a> OccupiedEntry<'a> {
     ///
     /// ```rust
     /// # #[macro_use]
-    /// # extern crate serde_json;
+    /// # extern crate tjson;
     /// #
     /// # fn main() {
-    /// use serde_json::map::Entry;
+    /// use tjson::map::Entry;
     ///
-    /// let mut map = serde_json::Map::new();
-    /// map.insert("serde".to_owned(), json!([1, 2, 3]));
+    /// let mut map = tjson::Map::new();
+    /// map.insert("serde".to_owned(), tjson!([1, 2, 3]));
     ///
     /// match map.entry("serde") {
     ///     Entry::Occupied(mut occupied) => {
-    ///         occupied.get_mut().as_array_mut().unwrap().push(json!(4));
+    ///         occupied.get_mut().as_array_mut().unwrap().push(tjson!(4));
     ///     }
     ///     Entry::Vacant(_) => unimplemented!(),
     /// }
@@ -611,17 +612,17 @@ impl<'a> OccupiedEntry<'a> {
     ///
     /// ```rust
     /// # #[macro_use]
-    /// # extern crate serde_json;
+    /// # extern crate tjson;
     /// #
     /// # fn main() {
-    /// use serde_json::map::Entry;
+    /// use tjson::map::Entry;
     ///
-    /// let mut map = serde_json::Map::new();
-    /// map.insert("serde".to_owned(), json!([1, 2, 3]));
+    /// let mut map = tjson::Map::new();
+    /// map.insert("serde".to_owned(), tjson!([1, 2, 3]));
     ///
     /// match map.entry("serde") {
     ///     Entry::Occupied(mut occupied) => {
-    ///         occupied.into_mut().as_array_mut().unwrap().push(json!(4));
+    ///         occupied.into_mut().as_array_mut().unwrap().push(tjson!(4));
     ///     }
     ///     Entry::Vacant(_) => unimplemented!(),
     /// }
@@ -641,17 +642,17 @@ impl<'a> OccupiedEntry<'a> {
     ///
     /// ```rust
     /// # #[macro_use]
-    /// # extern crate serde_json;
+    /// # extern crate tjson;
     /// #
     /// # fn main() {
-    /// use serde_json::map::Entry;
+    /// use tjson::map::Entry;
     ///
-    /// let mut map = serde_json::Map::new();
-    /// map.insert("serde".to_owned(), json!(12));
+    /// let mut map = tjson::Map::new();
+    /// map.insert("serde".to_owned(), tjson!(12));
     ///
     /// match map.entry("serde") {
     ///     Entry::Occupied(mut occupied) => {
-    ///         assert_eq!(occupied.insert(json!(13)), 12);
+    ///         assert_eq!(occupied.insert(tjson!(13)), 12);
     ///         assert_eq!(occupied.get(), 13);
     ///     }
     ///     Entry::Vacant(_) => unimplemented!(),
@@ -669,13 +670,13 @@ impl<'a> OccupiedEntry<'a> {
     ///
     /// ```rust
     /// # #[macro_use]
-    /// # extern crate serde_json;
+    /// # extern crate tjson;
     /// #
     /// # fn main() {
-    /// use serde_json::map::Entry;
+    /// use tjson::map::Entry;
     ///
-    /// let mut map = serde_json::Map::new();
-    /// map.insert("serde".to_owned(), json!(12));
+    /// let mut map = tjson::Map::new();
+    /// map.insert("serde".to_owned(), tjson!(12));
     ///
     /// match map.entry("serde") {
     ///     Entry::Occupied(occupied) => {
@@ -702,7 +703,7 @@ impl<'a> IntoIterator for &'a Map<String, Value> {
     }
 }
 
-/// An iterator over a serde_json::Map's entries.
+/// An iterator over a tjson::Map's entries.
 pub struct Iter<'a> {
     iter: IterImpl<'a>,
 }
@@ -725,7 +726,7 @@ impl<'a> IntoIterator for &'a mut Map<String, Value> {
     }
 }
 
-/// A mutable iterator over a serde_json::Map's entries.
+/// A mutable iterator over a tjson::Map's entries.
 pub struct IterMut<'a> {
     iter: IterMutImpl<'a>,
 }
@@ -748,7 +749,7 @@ impl IntoIterator for Map<String, Value> {
     }
 }
 
-/// An owning iterator over a serde_json::Map's entries.
+/// An owning iterator over a tjson::Map's entries.
 pub struct IntoIter {
     iter: IntoIterImpl,
 }
@@ -762,7 +763,7 @@ delegate_iterator!((IntoIter) => (String, Value));
 
 //////////////////////////////////////////////////////////////////////////////
 
-/// An iterator over a serde_json::Map's keys.
+/// An iterator over a tjson::Map's keys.
 pub struct Keys<'a> {
     iter: KeysImpl<'a>,
 }
@@ -776,7 +777,7 @@ delegate_iterator!((Keys<'a>) => &'a String);
 
 //////////////////////////////////////////////////////////////////////////////
 
-/// An iterator over a serde_json::Map's values.
+/// An iterator over a tjson::Map's values.
 pub struct Values<'a> {
     iter: ValuesImpl<'a>,
 }

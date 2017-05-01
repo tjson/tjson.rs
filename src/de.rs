@@ -1,3 +1,8 @@
+// Copyright 2017 Tony Arcieri
+//
+// Includes portions of code from the Serde JSON project:
+// https://github.com/serde-rs/json
+//
 // Copyright 2017 Serde Developers
 //
 // Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
@@ -33,7 +38,7 @@ impl<'de, R> Deserializer<R>
 where
     R: read::Read<'de>,
 {
-    /// Create a JSON deserializer from one of the possible serde_json input
+    /// Create a JSON deserializer from one of the possible tjson input
     /// sources.
     ///
     /// Typically it is more convenient to use one of these methods instead:
@@ -165,6 +170,7 @@ impl<'de, R: Read<'de>> Deserializer<R> {
             }
         };
 
+        // This is not the TJSON tag parsing code, sorry.
         let value = match peek {
             b'n' => {
                 self.eat_char();
@@ -675,7 +681,7 @@ impl<'de, 'a, R: Read<'de>> de::Deserializer<'de> for &'a mut Deserializer<R> {
     ///
     /// [RFC 7159]: https://tools.ietf.org/html/rfc7159
     ///
-    /// The behavior of serde_json is specified to fail on non-UTF-8 strings
+    /// The behavior of tjson is specified to fail on non-UTF-8 strings
     /// when deserializing into Rust UTF-8 string types such as String, and
     /// succeed with non-UTF-8 bytes when deserializing using this method.
     ///
@@ -687,14 +693,14 @@ impl<'de, 'a, R: Read<'de>> de::Deserializer<'de> for &'a mut Deserializer<R> {
     /// You can use this to parse JSON strings containing invalid UTF-8 bytes.
     ///
     /// ```rust
-    /// extern crate serde_json;
+    /// extern crate tjson;
     /// extern crate serde_bytes;
     ///
     /// use serde_bytes::ByteBuf;
     ///
-    /// fn look_at_bytes() -> Result<(), serde_json::Error> {
+    /// fn look_at_bytes() -> Result<(), tjson::Error> {
     ///     let json_data = b"\"some bytes: \xe5\x00\xe5\"";
-    ///     let bytes: ByteBuf = serde_json::from_slice(json_data)?;
+    ///     let bytes: ByteBuf = tjson::from_slice(json_data)?;
     ///
     ///     assert_eq!(b'\xe5', bytes[12]);
     ///     assert_eq!(b'\0', bytes[13]);
@@ -713,14 +719,14 @@ impl<'de, 'a, R: Read<'de>> de::Deserializer<'de> for &'a mut Deserializer<R> {
     /// Unicode code points.
     ///
     /// ```rust
-    /// extern crate serde_json;
+    /// extern crate tjson;
     /// extern crate serde_bytes;
     ///
     /// use serde_bytes::ByteBuf;
     ///
     /// fn look_at_bytes() {
     ///     let json_data = b"\"invalid unicode surrogate: \\uD801\"";
-    ///     let parsed: Result<ByteBuf, _> = serde_json::from_slice(json_data);
+    ///     let parsed: Result<ByteBuf, _> = tjson::from_slice(json_data);
     ///
     ///     assert!(parsed.is_err());
     ///
@@ -1084,9 +1090,9 @@ where
 /// errors.
 ///
 /// ```rust
-/// extern crate serde_json;
+/// extern crate tjson;
 ///
-/// use serde_json::{Deserializer, Value};
+/// use tjson::{Deserializer, Value};
 ///
 /// fn main() {
 ///     let data = "{\"k\": 3}  {}  [0, 1, 2]";
@@ -1110,7 +1116,7 @@ where
     R: read::Read<'de>,
     T: de::Deserialize<'de>,
 {
-    /// Create a JSON stream deserializer from one of the possible serde_json
+    /// Create a JSON stream deserializer from one of the possible tjson
     /// input sources.
     ///
     /// Typically it is more convenient to use one of these methods instead:
@@ -1136,7 +1142,7 @@ where
     /// ```rust
     /// let data = b"[0] [1] [";
     ///
-    /// let de = serde_json::Deserializer::from_slice(data);
+    /// let de = tjson::Deserializer::from_slice(data);
     /// let mut stream = de.into_iter::<Vec<i32>>();
     /// assert_eq!(0, stream.byte_offset());
     ///
@@ -1226,7 +1232,7 @@ where
 /// extern crate serde_derive;
 ///
 /// extern crate serde;
-/// extern crate serde_json;
+/// extern crate tjson;
 ///
 /// use std::error::Error;
 /// use std::fs::File;
@@ -1243,7 +1249,7 @@ where
 ///     let file = File::open(path)?;
 ///
 ///     // Read the JSON contents of the file as an instance of `User`.
-///     let u = serde_json::from_reader(file)?;
+///     let u = tjson::from_reader(file)?;
 ///
 ///     // Return the `User`.
 ///     Ok(u)
@@ -1281,7 +1287,7 @@ where
 /// extern crate serde_derive;
 ///
 /// extern crate serde;
-/// extern crate serde_json;
+/// extern crate tjson;
 ///
 /// #[derive(Deserialize, Debug)]
 /// struct User {
@@ -1296,7 +1302,7 @@ where
 ///                 \"location\": \"Menlo Park, CA\"
 ///               }";
 ///
-///     let u: User = serde_json::from_slice(j).unwrap();
+///     let u: User = tjson::from_slice(j).unwrap();
 ///     println!("{:#?}", u);
 /// }
 /// ```
@@ -1324,7 +1330,7 @@ where
 /// extern crate serde_derive;
 ///
 /// extern crate serde;
-/// extern crate serde_json;
+/// extern crate tjson;
 ///
 /// #[derive(Deserialize, Debug)]
 /// struct User {
@@ -1339,7 +1345,7 @@ where
 ///                \"location\": \"Menlo Park, CA\"
 ///              }";
 ///
-///     let u: User = serde_json::from_str(j).unwrap();
+///     let u: User = tjson::from_str(j).unwrap();
 ///     println!("{:#?}", u);
 /// }
 /// ```

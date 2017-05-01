@@ -18,7 +18,7 @@ use super::error::{Error, ErrorCode, Result};
 /// stable we can use actual specialization.
 ///
 /// This trait is sealed and cannot be implemented for types outside of
-/// `serde_json`.
+/// `tjson`.
 pub trait Read<'de>: private::Sealed {
     #[doc(hidden)]
     fn next(&mut self) -> io::Result<Option<u8>>;
