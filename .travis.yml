@@ -1,18 +1,26 @@
-sudo: false
 language: rust
 cache: cargo
+
+branches:
+  only:
+    - master
 
 # run builds for all the trains (and more)
 rust:
   - stable
-  - nightly
-  - 1.12.0
-  - 1.13.0
   - beta
+  - nightly
 
 matrix:
+  fast_finish: true
   include:
-    - rust: nightly
-      env: CLIPPY=true
+  - rust: stable
+    env: FEATURES="preserve_order"
+  - rust: beta
+    env: FEATURES="preserve_order"
+  - rust: nightly
+    env: FEATURES="preserve_order"
 
-script: ./travis.sh
+script:
+- cargo build --verbose --features="$FEATURES"
+- cargo test --verbose --features="$FEATURES"
