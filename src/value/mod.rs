@@ -1,3 +1,8 @@
+// Copyright 2017 Tony Arcieri
+//
+// Includes portions of code from the Serde JSON project:
+// https://github.com/serde-rs/json
+//
 // Copyright 2017 Serde Developers
 //
 // Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
@@ -6,21 +11,21 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-//! The Value enum, a loosely typed way of representing any valid JSON value.
+//! The Value enum, a loosely typed way of representing any valid TJSON value.
 //!
-//! # Constructing JSON
+//! # Constructing TJSON
 //!
-//! Serde JSON provides a [`json!` macro][macro] to build `serde_json::Value`
-//! objects with very natural JSON syntax. In order to use this macro,
-//! `serde_json` needs to be imported with the `#[macro_use]` attribute.
+//! This crate provides a [`tjson!` macro][macro] to build `tjson::Value`
+//! objects with natural syntax. In order to use this macro, `tjson` needs
+//! to be imported with the `#[macro_use]` attribute.
 //!
 //! ```rust
 //! #[macro_use]
-//! extern crate serde_json;
+//! extern crate tjson;
 //!
 //! fn main() {
-//!     // The type of `john` is `serde_json::Value`
-//!     let john = json!({
+//!     // The type of `john` is `tjson::Value`
+//!     let john = tjson!({
 //!       "name": "John Doe",
 //!       "age": 43,
 //!       "phones": [
@@ -31,22 +36,22 @@
 //!
 //!     println!("first phone number: {}", john["phones"][0]);
 //!
-//!     // Convert to a string of JSON and print it out
+//!     // Convert to a string of TJSON and print it out
 //!     println!("{}", john.to_string());
 //! }
 //! ```
 //!
-//! The `Value::to_string()` function converts a `serde_json::Value` into a
-//! `String` of JSON text.
+//! The `Value::to_string()` function converts a `tjson::Value` into a
+//! `String` of TJSON text.
 //!
-//! One neat thing about the `json!` macro is that variables and expressions can
-//! be interpolated directly into the JSON value as you are building it. Serde
+//! One neat thing about the `tjson!` macro is that variables and expressions can
+//! be interpolated directly into the TJSON value as you are building it. Serde
 //! will check at compile time that the value you are interpolating is able to
-//! be represented as JSON.
+//! be represented as TJSON.
 //!
 //! ```rust
 //! # #[macro_use]
-//! # extern crate serde_json;
+//! # extern crate tjson;
 //! #
 //! # fn random_phone() -> u16 { 0 }
 //! #
@@ -54,8 +59,8 @@
 //! let full_name = "John Doe";
 //! let age_last_year = 42;
 //!
-//! // The type of `john` is `serde_json::Value`
-//! let john = json!({
+//! // The type of `john` is `tjson::Value`
+//! let john = tjson!({
 //!   "name": full_name,
 //!   "age": age_last_year + 1,
 //!   "phones": [
@@ -66,19 +71,19 @@
 //! # }
 //! ```
 //!
-//! A string of JSON data can be parsed into a `serde_json::Value` by the
-//! [`serde_json::from_str`][from_str] function. There is also
+//! A string of TJSON data can be parsed into a `tjson::Value` by the
+//! [`tjson::from_str`][from_str] function. There is also
 //! [`from_slice`][from_slice] for parsing from a byte slice &[u8] and
 //! [`from_reader`][from_reader] for parsing from any `io::Read` like a File or
 //! a TCP stream.
 //!
 //! ```rust
-//! extern crate serde_json;
+//! extern crate tjson;
 //!
-//! use serde_json::{Value, Error};
+//! use tjson::{Value, Error};
 //!
 //! fn untyped_example() -> Result<(), Error> {
-//!     // Some JSON input data as a &str. Maybe this comes from the user.
+//!     // Some TJSON input data as a &str. Maybe this comes from the user.
 //!     let data = r#"{
 //!                     "name": "John Doe",
 //!                     "age": 43,
@@ -88,8 +93,8 @@
 //!                     ]
 //!                   }"#;
 //!
-//!     // Parse the string of data into serde_json::Value.
-//!     let v: Value = serde_json::from_str(data)?;
+//!     // Parse the string of data into tjson::Value.
+//!     let v: Value = tjson::from_str(data)?;
 //!
 //!     // Access parts of the data by indexing with square brackets.
 //!     println!("Please call {} at the number {}", v["name"], v["phones"][0]);
@@ -102,104 +107,140 @@
 //! # }
 //! ```
 //!
-//! [macro]: https://docs.serde.rs/serde_json/macro.json.html
-//! [from_str]: https://docs.serde.rs/serde_json/de/fn.from_str.html
-//! [from_slice]: https://docs.serde.rs/serde_json/de/fn.from_slice.html
-//! [from_reader]: https://docs.serde.rs/serde_json/de/fn.from_reader.html
-
-use std::i64;
-use std::str;
+//! [macro]: https://docs.rs/tjson/macro.json.html
+//! [from_str]: https://docs.rs/tjson/de/fn.from_str.html
+//! [from_slice]: https://docs.rs/tjson/de/fn.from_slice.html
+//! [from_reader]: https://docs.rs/tjson/de/fn.from_reader.html
 
 use serde::ser::Serialize;
 use serde::de::DeserializeOwned;
 
 use error::Error;
 pub use map::Map;
+pub use set::Set;
 pub use number::Number;
+
+use chrono::datetime::DateTime as ChronoDateTime;
+use chrono::offset::utc::UTC;
 
 pub use self::index::Index;
 
 use self::ser::Serializer;
 
-/// Represents any valid JSON value.
-///
-/// See the `serde_json::value` module documentation for usage examples.
-#[derive(Debug, Clone, PartialEq)]
-pub enum Value {
-    /// Represents a JSON null value.
-    ///
-    /// ```rust
-    /// # #[macro_use]
-    /// # extern crate serde_json;
-    /// #
-    /// # fn main() {
-    /// let v = json!(null);
-    /// # }
-    /// ```
-    Null,
+/// Alias for chrono::datetime::DateTime<UTC>
+pub type DateTime = ChronoDateTime<UTC>;
 
-    /// Represents a JSON boolean.
+/// Represents any valid TJSON value.
+#[derive(Clone, Debug, Hash, Eq, PartialEq, PartialOrd, Ord)]
+pub enum Value {
+    /// Since TJSON is non-nullable, this indicates cases where a requested
+    /// value is not present, e.g. for non-panicing `Index`
+    Undefined,
+
+    /// Represents a TJSON boolean.
     ///
     /// ```rust
     /// # #[macro_use]
-    /// # extern crate serde_json;
+    /// # extern crate tjson;
     /// #
     /// # fn main() {
-    /// let v = json!(true);
+    /// let v = tjson!(true);
     /// # }
     /// ```
     Bool(bool),
 
-    /// Represents a JSON number, whether integer or floating point.
+    /// Represents TJSON binary data (8-bit clean).
     ///
     /// ```rust
     /// # #[macro_use]
-    /// # extern crate serde_json;
+    /// # extern crate tjson;
     /// #
     /// # fn main() {
-    /// let v = json!(12.5);
+    /// let v = tjson!(b"a bytestring");
+    /// # }
+    /// ```
+    Data(Vec<u8>),
+
+    /// Represents a TJSON number: either a signed integer (`Number::Int`),
+    /// unsigned integer (`Number::UInt`), or floating point (`Number::Float`)
+    ///
+    /// ```rust
+    /// # #[macro_use]
+    /// # extern crate tjson;
+    /// #
+    /// # fn main() {
+    /// let f = tjson!(12.5);
+    /// let i = tjson!(-42);
+    /// let u = tjson!(0xFFFFFFFFFFFFFFFF);
     /// # }
     /// ```
     Number(Number),
 
-    /// Represents a JSON string.
+    /// Represents a TJSON Unicode String.
     ///
     /// ```rust
     /// # #[macro_use]
-    /// # extern crate serde_json;
+    /// # extern crate tjson;
     /// #
     /// # fn main() {
-    /// let v = json!("a string");
+    /// let v = tjson!("a string");
     /// # }
-    /// ```
     String(String),
 
-    /// Represents a JSON array.
+    /// Represents a TJSON timestamp (always UTC).
+    ///
+    /// ```rust
+    /// # extern crate chrono;
+    /// # #[macro_use]
+    /// # extern crate tjson;
+    /// # use chrono::offset::utc::UTC;
+    /// #
+    /// # fn main() {
+    /// let v = tjson!(UTC::now());
+    /// # }
+    Timestamp(DateTime),
+
+    /// Represents a TJSON array.
     ///
     /// ```rust
     /// # #[macro_use]
-    /// # extern crate serde_json;
+    /// # extern crate tjson;
     /// #
     /// # fn main() {
-    /// let v = json!(["an", "array"]);
+    /// let v = tjson!(["an", "array"]);
     /// # }
     /// ```
     Array(Vec<Value>),
 
-    /// Represents a JSON object.
+    /// Represents a TJSON set.
     ///
-    /// By default the map is backed by a BTreeMap. Enable the `preserve_order`
-    /// feature of serde_json to use LinkedHashMap instead, which preserves
-    /// entries in the order they are inserted into the map. In particular, this
-    /// allows JSON data to be deserialized into a Value and serialized to a
-    /// string while retaining the order of map keys in the input.
+    /// By default the set is backed by a `BTreeSet`. Enable the
+    /// `preserve_order` feature of this crate to use `LinkedHashMap` instead,
+    /// which preserves entries in the order they are inserted into the set.
     ///
     /// ```rust
     /// # #[macro_use]
-    /// # extern crate serde_json;
+    /// # extern crate tjson;
+    /// # use tjson::set::Set;
     /// #
     /// # fn main() {
-    /// let v = json!({ "an": "object" });
+    /// let v = tjson!(Set::new());
+    /// # }
+    /// ```
+    Set(Set<Value>),
+
+    /// Represents a TJSON object.
+    ///
+    /// By default the map is backed by a `BTreeMap`. Enable the
+    /// `preserve_order` feature of this crate to use `LinkedHashMap` instead,
+    /// which preserves entries in the order they are inserted into the map.
+    ///
+    /// ```rust
+    /// # #[macro_use]
+    /// # extern crate tjson;
+    /// #
+    /// # fn main() {
+    /// let v = tjson!({ "an": "object" });
     /// # }
     /// ```
     Object(Map<String, Value>),
@@ -213,7 +254,7 @@ fn parse_index(s: &str) -> Option<usize> {
 }
 
 impl Value {
-    /// Index into a JSON array or map. A string index can be used to access a
+    /// Index into a TJSON array or map. A string index can be used to access a
     /// value in a map, and a usize index can be used to access an element of an
     /// array.
     ///
@@ -224,44 +265,44 @@ impl Value {
     ///
     /// ```rust
     /// # #[macro_use]
-    /// # extern crate serde_json;
+    /// # extern crate tjson;
     /// #
     /// # fn main() {
-    /// let object = json!({ "A": 65, "B": 66, "C": 67 });
-    /// assert_eq!(*object.get("A").unwrap(), json!(65));
+    /// let object = tjson!({ "A": 65, "B": 66, "C": 67 });
+    /// assert_eq!(*object.get("A").unwrap(), tjson!(65));
     ///
-    /// let array = json!([ "A", "B", "C" ]);
-    /// assert_eq!(*array.get(2).unwrap(), json!("C"));
+    /// let array = tjson!([ "A", "B", "C" ]);
+    /// assert_eq!(*array.get(2).unwrap(), tjson!("C"));
     ///
     /// assert_eq!(array.get("A"), None);
     /// # }
     /// ```
     ///
     /// Square brackets can also be used to index into a value in a more concise
-    /// way. This returns `Value::Null` in cases where `get` would have returned
+    /// way. This returns `Value::Undefined` in cases where `get` would have returned
     /// `None`.
     ///
     /// ```rust
     /// # #[macro_use]
-    /// # extern crate serde_json;
+    /// # extern crate tjson;
     /// #
     /// # fn main() {
-    /// let object = json!({
+    /// let object = tjson!({
     ///     "A": ["a", "á", "à"],
     ///     "B": ["b", "b́"],
     ///     "C": ["c", "ć", "ć̣", "ḉ"],
     /// });
-    /// assert_eq!(object["B"][0], json!("b"));
+    /// assert_eq!(object["B"][0], tjson!("b"));
     ///
-    /// assert_eq!(object["D"], json!(null));
-    /// assert_eq!(object[0]["x"]["y"]["z"], json!(null));
+    /// assert_eq!(object["D"], tjson!(null));
+    /// assert_eq!(object[0]["x"]["y"]["z"], tjson!(null));
     /// # }
     /// ```
     pub fn get<I: Index>(&self, index: I) -> Option<&Value> {
         index.index_into(self)
     }
 
-    /// Mutably index into a JSON array or map. A string index can be used to
+    /// Mutably index into a TJSON array or map. A string index can be used to
     /// access a value in a map, and a usize index can be used to access an
     /// element of an array.
     ///
@@ -272,14 +313,14 @@ impl Value {
     ///
     /// ```rust
     /// # #[macro_use]
-    /// # extern crate serde_json;
+    /// # extern crate tjson;
     /// #
     /// # fn main() {
-    /// let mut object = json!({ "A": 65, "B": 66, "C": 67 });
-    /// *object.get_mut("A").unwrap() = json!(69);
+    /// let mut object = tjson!({ "A": 65, "B": 66, "C": 67 });
+    /// *object.get_mut("A").unwrap() = tjson!(69);
     ///
-    /// let mut array = json!([ "A", "B", "C" ]);
-    /// *array.get_mut(2).unwrap() = json!("D");
+    /// let mut array = tjson!([ "A", "B", "C" ]);
+    /// *array.get_mut(2).unwrap() = tjson!("D");
     /// # }
     /// ```
     pub fn get_mut<I: Index>(&mut self, index: I) -> Option<&mut Value> {
@@ -294,10 +335,10 @@ impl Value {
     ///
     /// ```rust
     /// # #[macro_use]
-    /// # extern crate serde_json;
+    /// # extern crate tjson;
     /// #
     /// # fn main() {
-    /// let obj = json!({ "a": { "nested": true }, "b": ["an", "array"] });
+    /// let obj = tjson!({ "a": { "nested": true }, "b": ["an", "array"] });
     ///
     /// assert!(obj.is_object());
     /// assert!(obj["a"].is_object());
@@ -315,10 +356,10 @@ impl Value {
     ///
     /// ```rust
     /// # #[macro_use]
-    /// # extern crate serde_json;
+    /// # extern crate tjson;
     /// #
     /// # fn main() {
-    /// let v = json!({ "a": { "nested": true }, "b": ["an", "array"] });
+    /// let v = tjson!({ "a": { "nested": true }, "b": ["an", "array"] });
     ///
     /// // The length of `{"nested": true}` is 1 entry.
     /// assert_eq!(v["a"].as_object().unwrap().len(), 1);
@@ -339,13 +380,13 @@ impl Value {
     ///
     /// ```rust
     /// # #[macro_use]
-    /// # extern crate serde_json;
+    /// # extern crate tjson;
     /// #
     /// # fn main() {
-    /// let mut v = json!({ "a": { "nested": true } });
+    /// let mut v = tjson!({ "a": { "nested": true } });
     ///
     /// v["a"].as_object_mut().unwrap().clear();
-    /// assert_eq!(v, json!({ "a": {} }));
+    /// assert_eq!(v, tjson!({ "a": {} }));
     /// # }
     ///
     /// ```
@@ -364,10 +405,10 @@ impl Value {
     ///
     /// ```rust
     /// # #[macro_use]
-    /// # extern crate serde_json;
+    /// # extern crate tjson;
     /// #
     /// # fn main() {
-    /// let obj = json!({ "a": ["an", "array"], "b": { "an": "object" } });
+    /// let obj = tjson!({ "a": ["an", "array"], "b": { "an": "object" } });
     ///
     /// assert!(obj["a"].is_array());
     ///
@@ -384,10 +425,10 @@ impl Value {
     ///
     /// ```rust
     /// # #[macro_use]
-    /// # extern crate serde_json;
+    /// # extern crate tjson;
     /// #
     /// # fn main() {
-    /// let v = json!({ "a": ["an", "array"], "b": { "an": "object" } });
+    /// let v = tjson!({ "a": ["an", "array"], "b": { "an": "object" } });
     ///
     /// // The length of `["an", "array"]` is 2 elements.
     /// assert_eq!(v["a"].as_array().unwrap().len(), 2);
@@ -408,13 +449,13 @@ impl Value {
     ///
     /// ```rust
     /// # #[macro_use]
-    /// # extern crate serde_json;
+    /// # extern crate tjson;
     /// #
     /// # fn main() {
-    /// let mut v = json!({ "a": ["an", "array"] });
+    /// let mut v = tjson!({ "a": ["an", "array"] });
     ///
     /// v["a"].as_array_mut().unwrap().clear();
-    /// assert_eq!(v, json!({ "a": [] }));
+    /// assert_eq!(v, tjson!({ "a": [] }));
     /// # }
     /// ```
     pub fn as_array_mut(&mut self) -> Option<&mut Vec<Value>> {
@@ -431,10 +472,10 @@ impl Value {
     ///
     /// ```rust
     /// # #[macro_use]
-    /// # extern crate serde_json;
+    /// # extern crate tjson;
     /// #
     /// # fn main() {
-    /// let v = json!({ "a": "some string", "b": false });
+    /// let v = tjson!({ "a": "some string", "b": false });
     ///
     /// assert!(v["a"].is_string());
     ///
@@ -451,10 +492,10 @@ impl Value {
     ///
     /// ```rust
     /// # #[macro_use]
-    /// # extern crate serde_json;
+    /// # extern crate tjson;
     /// #
     /// # fn main() {
-    /// let v = json!({ "a": "some string", "b": false });
+    /// let v = tjson!({ "a": "some string", "b": false });
     ///
     /// assert_eq!(v["a"].as_str(), Some("some string"));
     ///
@@ -473,10 +514,10 @@ impl Value {
     ///
     /// ```rust
     /// # #[macro_use]
-    /// # extern crate serde_json;
+    /// # extern crate tjson;
     /// #
     /// # fn main() {
-    /// let v = json!({ "a": 1, "b": "2" });
+    /// let v = tjson!({ "a": 1, "b": "2" });
     ///
     /// assert!(v["a"].is_number());
     ///
@@ -499,13 +540,13 @@ impl Value {
     ///
     /// ```rust
     /// # #[macro_use]
-    /// # extern crate serde_json;
+    /// # extern crate tjson;
     /// #
     /// # use std::i64;
     /// #
     /// # fn main() {
     /// let big = i64::MAX as u64 + 10;
-    /// let v = json!({ "a": 64, "b": big, "c": 256.0 });
+    /// let v = tjson!({ "a": 64, "b": big, "c": 256.0 });
     ///
     /// assert!(v["a"].is_i64());
     ///
@@ -530,10 +571,10 @@ impl Value {
     ///
     /// ```rust
     /// # #[macro_use]
-    /// # extern crate serde_json;
+    /// # extern crate tjson;
     /// #
     /// # fn main() {
-    /// let v = json!({ "a": 64, "b": -64, "c": 256.0 });
+    /// let v = tjson!({ "a": 64, "b": -64, "c": 256.0 });
     ///
     /// assert!(v["a"].is_u64());
     ///
@@ -561,10 +602,10 @@ impl Value {
     ///
     /// ```rust
     /// # #[macro_use]
-    /// # extern crate serde_json;
+    /// # extern crate tjson;
     /// #
     /// # fn main() {
-    /// let v = json!({ "a": 256.0, "b": 64, "c": -64 });
+    /// let v = tjson!({ "a": 256.0, "b": 64, "c": -64 });
     ///
     /// assert!(v["a"].is_f64());
     ///
@@ -585,13 +626,13 @@ impl Value {
     ///
     /// ```rust
     /// # #[macro_use]
-    /// # extern crate serde_json;
+    /// # extern crate tjson;
     /// #
     /// # use std::i64;
     /// #
     /// # fn main() {
     /// let big = i64::MAX as u64 + 10;
-    /// let v = json!({ "a": 64, "b": big, "c": 256.0 });
+    /// let v = tjson!({ "a": 64, "b": big, "c": 256.0 });
     ///
     /// assert_eq!(v["a"].as_i64(), Some(64));
     /// assert_eq!(v["b"].as_i64(), None);
@@ -610,10 +651,10 @@ impl Value {
     ///
     /// ```rust
     /// # #[macro_use]
-    /// # extern crate serde_json;
+    /// # extern crate tjson;
     /// #
     /// # fn main() {
-    /// let v = json!({ "a": 64, "b": -64, "c": 256.0 });
+    /// let v = tjson!({ "a": 64, "b": -64, "c": 256.0 });
     ///
     /// assert_eq!(v["a"].as_u64(), Some(64));
     /// assert_eq!(v["b"].as_u64(), None);
@@ -632,10 +673,10 @@ impl Value {
     ///
     /// ```rust
     /// # #[macro_use]
-    /// # extern crate serde_json;
+    /// # extern crate tjson;
     /// #
     /// # fn main() {
-    /// let v = json!({ "a": 256.0, "b": 64, "c": -64 });
+    /// let v = tjson!({ "a": 256.0, "b": 64, "c": -64 });
     ///
     /// assert_eq!(v["a"].as_f64(), Some(256.0));
     /// assert_eq!(v["b"].as_f64(), Some(64.0));
@@ -656,10 +697,10 @@ impl Value {
     ///
     /// ```rust
     /// # #[macro_use]
-    /// # extern crate serde_json;
+    /// # extern crate tjson;
     /// #
     /// # fn main() {
-    /// let v = json!({ "a": false, "b": "false" });
+    /// let v = tjson!({ "a": false, "b": "false" });
     ///
     /// assert!(v["a"].is_boolean());
     ///
@@ -676,10 +717,10 @@ impl Value {
     ///
     /// ```rust
     /// # #[macro_use]
-    /// # extern crate serde_json;
+    /// # extern crate tjson;
     /// #
     /// # fn main() {
-    /// let v = json!({ "a": false, "b": "false" });
+    /// let v = tjson!({ "a": false, "b": "false" });
     ///
     /// assert_eq!(v["a"].as_bool(), Some(false));
     ///
@@ -694,46 +735,46 @@ impl Value {
         }
     }
 
-    /// Returns true if the `Value` is a Null. Returns false otherwise.
+    /// Returns true if the `Value` is Undefined. Returns false otherwise.
     ///
-    /// For any Value on which `is_null` returns true, `as_null` is guaranteed
+    /// For any Value on which `is_undefined` returns true, `as_undefined` is guaranteed
     /// to return `Some(())`.
     ///
     /// ```rust
     /// # #[macro_use]
-    /// # extern crate serde_json;
+    /// # extern crate tjson;
     /// #
     /// # fn main() {
-    /// let v = json!({ "a": null, "b": false });
+    /// let v = tjson!({ "a": null, "b": false });
     ///
-    /// assert!(v["a"].is_null());
+    /// assert!(v["a"].is_undefined());
     ///
     /// // The boolean `false` is not null.
-    /// assert!(!v["b"].is_null());
+    /// assert!(!v["b"].is_undefined());
     /// # }
     /// ```
-    pub fn is_null(&self) -> bool {
-        self.as_null().is_some()
+    pub fn is_undefined(&self) -> bool {
+        self.as_undefined().is_some()
     }
 
-    /// If the `Value` is a Null, returns (). Returns None otherwise.
+    /// If the `Value` is Undefined, returns (). Returns None otherwise.
     ///
     /// ```rust
     /// # #[macro_use]
-    /// # extern crate serde_json;
+    /// # extern crate tjson;
     /// #
     /// # fn main() {
-    /// let v = json!({ "a": null, "b": false });
+    /// let v = tjson!({ "a": null, "b": false });
     ///
-    /// assert_eq!(v["a"].as_null(), Some(()));
+    /// assert_eq!(v["a"].as_undefined(), Some(()));
     ///
     /// // The boolean `false` is not null.
-    /// assert_eq!(v["b"].as_null(), None);
+    /// assert_eq!(v["b"].as_undefined(), None);
     /// # }
     /// ```
-    pub fn as_null(&self) -> Option<()> {
+    pub fn as_undefined(&self) -> Option<()> {
         match *self {
-            Value::Null => Some(()),
+            Value::Undefined => Some(()),
             _ => None,
         }
     }
@@ -754,16 +795,16 @@ impl Value {
     ///
     /// ```rust
     /// # #[macro_use]
-    /// # extern crate serde_json;
+    /// # extern crate tjson;
     /// #
     /// # fn main() {
-    /// let data = json!({
+    /// let data = tjson!({
     ///     "x": {
     ///         "y": ["z", "zz"]
     ///     }
     /// });
     ///
-    /// assert_eq!(data.pointer("/x/y/1").unwrap(), &json!("zz"));
+    /// assert_eq!(data.pointer("/x/y/1").unwrap(), &tjson!("zz"));
     /// assert_eq!(data.pointer("/a/b/c"), None);
     /// # }
     /// ```
@@ -811,14 +852,14 @@ impl Value {
     /// # Example of Use
     ///
     /// ```rust
-    /// extern crate serde_json;
+    /// extern crate tjson;
     ///
-    /// use serde_json::Value;
+    /// use tjson::Value;
     /// use std::mem;
     ///
     /// fn main() {
     ///     let s = r#"{"x": 1.0, "y": 2.0}"#;
-    ///     let mut value: Value = serde_json::from_str(s).unwrap();
+    ///     let mut value: Value = tjson::from_str(s).unwrap();
     ///
     ///     // Check value using read-only pointer
     ///     assert_eq!(value.pointer("/x"), Some(&1.0.into()));
@@ -828,9 +869,9 @@ impl Value {
     ///     assert_eq!(value.pointer("/x"), Some(&1.5.into()));
     ///
     ///     // "Steal" ownership of a value. Can replace with any valid Value.
-    ///     let old_x = value.pointer_mut("/x").map(|x| mem::replace(x, Value::Null)).unwrap();
+    ///     let old_x = value.pointer_mut("/x").map(|x| mem::replace(x, Value::Undefined)).unwrap();
     ///     assert_eq!(old_x, 1.5);
-    ///     assert_eq!(value.pointer("/x").unwrap(), &Value::Null);
+    ///     assert_eq!(value.pointer("/x").unwrap(), &Value::Undefined);
     /// }
     /// ```
     pub fn pointer_mut<'a>(&'a mut self, pointer: &str) -> Option<&'a mut Value> {
@@ -867,7 +908,13 @@ impl Value {
     }
 }
 
-/// The default value is `Value::Null`.
+mod index;
+mod partial_eq;
+mod from;
+mod ser;
+mod de;
+
+/// The default value is `Value::Undefined`.
 ///
 /// This is useful for handling omitted `Value` fields when deserializing.
 ///
@@ -877,9 +924,9 @@ impl Value {
 /// # #[macro_use]
 /// # extern crate serde_derive;
 /// #
-/// # extern crate serde_json;
+/// # extern crate tjson;
 /// #
-/// use serde_json::Value;
+/// use tjson::Value;
 ///
 /// #[derive(Deserialize)]
 /// struct Settings {
@@ -888,12 +935,12 @@ impl Value {
 ///     extras: Value,
 /// }
 ///
-/// # fn try_main() -> Result<(), serde_json::Error> {
+/// # fn try_main() -> Result<(), tjson::Error> {
 /// let data = r#" { "level": 42 } "#;
-/// let s: Settings = serde_json::from_str(data)?;
+/// let s: Settings = tjson::from_str(data)?;
 ///
 /// assert_eq!(s.level, 42);
-/// assert_eq!(s.extras, Value::Null);
+/// assert_eq!(s.extras, Value::Undefined);
 /// #
 /// #     Ok(())
 /// # }
@@ -904,18 +951,12 @@ impl Value {
 /// ```
 impl Default for Value {
     fn default() -> Value {
-        Value::Null
+        Value::Undefined
     }
 }
 
-mod index;
-mod partial_eq;
-mod from;
-mod ser;
-mod de;
-
-/// Convert a `T` into `serde_json::Value` which is an enum that can represent
-/// any valid JSON data.
+/// Convert a `T` into `tjson::Value` which is an enum that can represent
+/// any valid TJSON data.
 ///
 /// ```rust
 /// extern crate serde;
@@ -924,7 +965,7 @@ mod de;
 /// extern crate serde_derive;
 ///
 /// #[macro_use]
-/// extern crate serde_json;
+/// extern crate tjson;
 ///
 /// use std::error::Error;
 ///
@@ -940,13 +981,13 @@ mod de;
 ///         location: "Menlo Park, CA".to_owned(),
 ///     };
 ///
-///     // The type of `expected` is `serde_json::Value`
-///     let expected = json!({
+///     // The type of `expected` is `tjson::Value`
+///     let expected = tjson!({
 ///                            "fingerprint": "0xF9BA143B95FF6D82",
 ///                            "location": "Menlo Park, CA",
 ///                          });
 ///
-///     let v = serde_json::to_value(u).unwrap();
+///     let v = tjson::to_value(u).unwrap();
 ///     assert_eq!(v, expected);
 ///
 ///     Ok(())
@@ -963,7 +1004,7 @@ mod de;
 /// fail, or if `T` contains a map with non-string keys.
 ///
 /// ```rust
-/// extern crate serde_json;
+/// extern crate tjson;
 ///
 /// use std::collections::BTreeMap;
 ///
@@ -972,12 +1013,9 @@ mod de;
 ///     let mut map = BTreeMap::new();
 ///     map.insert(vec![32, 64], "x86");
 ///
-///     println!("{}", serde_json::to_value(map).unwrap_err());
+///     println!("{}", tjson::to_value(map).unwrap_err());
 /// }
 /// ```
-#[cfg_attr(feature = "cargo-clippy", allow(needless_pass_by_value))]
-// Taking by value is more friendly to iterator adapters, option and result
-// consumers, etc. See https://github.com/serde-rs/json/pull/149.
 pub fn to_value<T>(value: T) -> Result<Value, Error>
 where
     T: Serialize,
@@ -985,19 +1023,19 @@ where
     value.serialize(Serializer)
 }
 
-/// Interpret a `serde_json::Value` as an instance of type `T`.
+/// Interpret a `tjson::Value` as an instance of type `T`.
 ///
 /// This conversion can fail if the structure of the Value does not match the
 /// structure expected by `T`, for example if `T` is a struct type but the Value
-/// contains something other than a JSON map. It can also fail if the structure
+/// contains something other than a TJSON map. It can also fail if the structure
 /// is correct but `T`'s implementation of `Deserialize` decides that something
 /// is wrong with the data, for example required struct fields are missing from
-/// the JSON map or some number is too big to fit in the expected primitive
+/// the TJSON map or some number is too big to fit in the expected primitive
 /// type.
 ///
 /// ```rust
 /// #[macro_use]
-/// extern crate serde_json;
+/// extern crate tjson;
 ///
 /// #[macro_use]
 /// extern crate serde_derive;
@@ -1011,13 +1049,13 @@ where
 /// }
 ///
 /// fn main() {
-///     // The type of `j` is `serde_json::Value`
-///     let j = json!({
+///     // The type of `j` is `tjson::Value`
+///     let j = tjson!({
 ///                     "fingerprint": "0xF9BA143B95FF6D82",
 ///                     "location": "Menlo Park, CA"
 ///                   });
 ///
-///     let u: User = serde_json::from_value(j).unwrap();
+///     let u: User = tjson::from_value(j).unwrap();
 ///     println!("{:#?}", u);
 /// }
 /// ```

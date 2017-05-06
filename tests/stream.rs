@@ -7,13 +7,12 @@
 // except according to those terms.
 
 #![cfg(not(feature = "preserve_order"))]
-
 extern crate serde;
 
 #[macro_use]
-extern crate serde_json;
+extern crate tjson;
 
-use serde_json::{Deserializer, Value};
+use tjson::{Deserializer, Value};
 
 macro_rules! test_stream {
     ($data:expr, $ty:ty, |$stream:ident| $test:block) => {
@@ -111,7 +110,7 @@ fn test_json_stream_primitive() {
 
     test_stream!(
         data, Value, |stream| {
-            assert_eq!(stream.next().unwrap().unwrap(), json!({}));
+            assert_eq!(stream.next().unwrap().unwrap(), tjson!({}));
             assert_eq!(stream.byte_offset(), 2);
 
             let second = stream.next().unwrap().unwrap_err();

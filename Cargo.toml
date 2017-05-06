@@ -1,39 +1,46 @@
 [package]
-name = "serde_json"
-version = "1.0.1" # remember to update html_root_url
-authors = ["Erick Tryzelaar <erick.tryzelaar@gmail.com>"]
-license = "MIT/Apache-2.0"
-description = "A JSON serialization file format"
-repository = "https://github.com/serde-rs/json"
-documentation = "http://docs.serde.rs/serde_json/"
-keywords = ["json", "serde", "serialization"]
-categories = ["encoding"]
-readme = "README.md"
-include = ["Cargo.toml", "src/**/*.rs", "README.md", "LICENSE-APACHE", "LICENSE-MIT"]
+name        = "tjson"
+description = "Tagged JSON (TJSON) parser/serializer based on serde"
+version     = "0.0.0"
+license     = "MIT/Apache-2.0"
+authors     = ["Tony Arcieri <bascule@gmail.com>"]
+homepage    = "https://www.tjson.org"
+repository  = "https://github.com/tjson/tjson-rust"
+readme      = "README.md"
+categories  = ["encoding"]
+keywords    = ["encoding", "json", "serialization", "serde"]
 
 [badges]
-travis-ci = { repository = "serde-rs/json" }
-appveyor = { repository = "serde-rs/json" }
+travis-ci = { repository = "tjson/tjson-rust" }
 
 [dependencies]
-serde = "1.0"
+itoa = "^0.3"
+dtoa = "^0.4"
 num-traits = "0.1.32"
-linked-hash-map = { version = "0.4.1", optional = true }
-itoa = "0.3"
-dtoa = "0.4"
+serde = "^1.0"
+
+[dependencies.chrono]
+version = "^0.3.1"
+features = ["serde"]
+
+[dependencies.linked-hash-map]
+version = "^0.4"
+optional = true
+
+[dependencies.ordered-float]
+version = "^0.4"
+features = ["serde"]
 
 [dev-dependencies]
-compiletest_rs = "0.2"
 serde_bytes = "0.10"
 serde_derive = "1.0"
-
 
 ### FEATURES #################################################################
 
 [features]
 default = []
 
-# Use LinkedHashMap rather than BTreeMap as the map type of serde_json::Value.
-# This allows data to be read into a Value and written back to a JSON string
-# while preserving the order of map keys in the input.
+# Use LinkedHashMap rather than BTreeMap as the underlying implementation of
+# the Map and Set types used by tjson::Value. This allows data to be read into
+# a Value and written back while preserving the original element ordering.
 preserve_order = ["linked-hash-map"]

@@ -1,3 +1,8 @@
+// Copyright 2017 Tony Arcieri
+//
+// Includes portions of code from the Serde JSON project:
+// https://github.com/serde-rs/json
+//
 // Copyright 2017 Serde Developers
 //
 // Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
@@ -6,29 +11,32 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
+//! Number types available in TJSON
+
 use error::Error;
 use num_traits::NumCast;
+use ordered_float::OrderedFloat;
 use serde::de::{self, Visitor, Unexpected};
 use serde::{Serialize, Serializer, Deserialize, Deserializer};
 use std::fmt::{self, Debug, Display};
 use std::i64;
 
-/// Represents a JSON number, whether integer or floating point.
-#[derive(Clone, PartialEq)]
+/// Represents a TJSON number, whether integer or floating point.
+#[derive(Copy, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Number {
     n: N,
 }
 
-// "N" is a prefix of "NegInt"... this is a false positive.
-// https://github.com/Manishearth/rust-clippy/issues/1241
-#[cfg_attr(feature = "cargo-clippy", allow(enum_variant_names))]
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
 enum N {
-    PosInt(u64),
-    /// Always less than zero.
-    NegInt(i64),
-    /// Always finite.
-    Float(f64),
+    /// Signed integer (not necessarily less than zero).
+    Int(i64),
+
+    /// Unsigned integer
+    UInt(u64),
+
+    /// Floating point (always finite).
+    Float(OrderedFloat<f64>),
 }
 
 impl Number {
@@ -40,13 +48,13 @@ impl Number {
     ///
     /// ```rust
     /// # #[macro_use]
-    /// # extern crate serde_json;
+    /// # extern crate tjson;
     /// #
     /// # use std::i64;
     /// #
     /// # fn main() {
     /// let big = i64::MAX as u64 + 10;
-    /// let v = json!({ "a": 64, "b": big, "c": 256.0 });
+    /// let v = tjson!({ "a": 64, "b": big, "c": 256.0 });
     ///
     /// assert!(v["a"].is_i64());
     ///
@@ -60,8 +68,8 @@ impl Number {
     #[inline]
     pub fn is_i64(&self) -> bool {
         match self.n {
-            N::PosInt(v) => v <= i64::MAX as u64,
-            N::NegInt(_) => true,
+            N::Int(_) => true,
+            N::UInt(v) => v <= i64::MAX as u64,
             N::Float(_) => false,
         }
     }
@@ -73,10 +81,10 @@ impl Number {
     ///
     /// ```rust
     /// # #[macro_use]
-    /// # extern crate serde_json;
+    /// # extern crate tjson;
     /// #
     /// # fn main() {
-    /// let v = json!({ "a": 64, "b": -64, "c": 256.0 });
+    /// let v = tjson!({ "a": 64, "b": -64, "c": 256.0 });
     ///
     /// assert!(v["a"].is_u64());
     ///
@@ -90,8 +98,8 @@ impl Number {
     #[inline]
     pub fn is_u64(&self) -> bool {
         match self.n {
-            N::PosInt(_) => true,
-            N::NegInt(_) | N::Float(_) => false,
+            N::UInt(_) => true,
+            N::Int(_) | N::Float(_) => false,
         }
     }
 
@@ -105,10 +113,10 @@ impl Number {
     ///
     /// ```rust
     /// # #[macro_use]
-    /// # extern crate serde_json;
+    /// # extern crate tjson;
     /// #
     /// # fn main() {
-    /// let v = json!({ "a": 256.0, "b": 64, "c": -64 });
+    /// let v = tjson!({ "a": 256.0, "b": 64, "c": -64 });
     ///
     /// assert!(v["a"].is_f64());
     ///
@@ -121,7 +129,7 @@ impl Number {
     pub fn is_f64(&self) -> bool {
         match self.n {
             N::Float(_) => true,
-            N::PosInt(_) | N::NegInt(_) => false,
+            N::UInt(_) | N::Int(_) => false,
         }
     }
 
@@ -130,13 +138,13 @@ impl Number {
     ///
     /// ```rust
     /// # #[macro_use]
-    /// # extern crate serde_json;
+    /// # extern crate tjson;
     /// #
     /// # use std::i64;
     /// #
     /// # fn main() {
     /// let big = i64::MAX as u64 + 10;
-    /// let v = json!({ "a": 64, "b": big, "c": 256.0 });
+    /// let v = tjson!({ "a": 64, "b": big, "c": 256.0 });
     ///
     /// assert_eq!(v["a"].as_i64(), Some(64));
     /// assert_eq!(v["b"].as_i64(), None);
@@ -146,8 +154,8 @@ impl Number {
     #[inline]
     pub fn as_i64(&self) -> Option<i64> {
         match self.n {
-            N::PosInt(n) => NumCast::from(n),
-            N::NegInt(n) => Some(n),
+            N::Int(n) => Some(n),
+            N::UInt(n) => NumCast::from(n),
             N::Float(_) => None,
         }
     }
@@ -157,10 +165,10 @@ impl Number {
     ///
     /// ```rust
     /// # #[macro_use]
-    /// # extern crate serde_json;
+    /// # extern crate tjson;
     /// #
     /// # fn main() {
-    /// let v = json!({ "a": 64, "b": -64, "c": 256.0 });
+    /// let v = tjson!({ "a": 64, "b": -64, "c": 256.0 });
     ///
     /// assert_eq!(v["a"].as_u64(), Some(64));
     /// assert_eq!(v["b"].as_u64(), None);
@@ -170,8 +178,8 @@ impl Number {
     #[inline]
     pub fn as_u64(&self) -> Option<u64> {
         match self.n {
-            N::PosInt(n) => Some(n),
-            N::NegInt(n) => NumCast::from(n),
+            N::Int(n) => NumCast::from(n),
+            N::UInt(n) => Some(n),
             N::Float(_) => None,
         }
     }
@@ -180,10 +188,10 @@ impl Number {
     ///
     /// ```rust
     /// # #[macro_use]
-    /// # extern crate serde_json;
+    /// # extern crate tjson;
     /// #
     /// # fn main() {
-    /// let v = json!({ "a": 256.0, "b": 64, "c": -64 });
+    /// let v = tjson!({ "a": 256.0, "b": 64, "c": -64 });
     ///
     /// assert_eq!(v["a"].as_f64(), Some(256.0));
     /// assert_eq!(v["b"].as_f64(), Some(64.0));
@@ -193,9 +201,9 @@ impl Number {
     #[inline]
     pub fn as_f64(&self) -> Option<f64> {
         match self.n {
-            N::PosInt(n) => NumCast::from(n),
-            N::NegInt(n) => NumCast::from(n),
-            N::Float(n) => Some(n),
+            N::Int(n) => NumCast::from(n),
+            N::UInt(n) => NumCast::from(n),
+            N::Float(n) => Some(n.into()),
         }
     }
 
@@ -205,7 +213,7 @@ impl Number {
     /// ```rust
     /// # use std::f64;
     /// #
-    /// # use serde_json::Number;
+    /// # use tjson::Number;
     /// #
     /// assert!(Number::from_f64(256.0).is_some());
     ///
@@ -214,7 +222,7 @@ impl Number {
     #[inline]
     pub fn from_f64(f: f64) -> Option<Number> {
         if f.is_finite() {
-            Some(Number { n: N::Float(f) })
+            Some(Number { n: N::Float(f.into()) })
         } else {
             None
         }
@@ -224,8 +232,8 @@ impl Number {
 impl fmt::Display for Number {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         match self.n {
-            N::PosInt(i) => Display::fmt(&i, formatter),
-            N::NegInt(i) => Display::fmt(&i, formatter),
+            N::Int(i) => Display::fmt(&i, formatter),
+            N::UInt(i) => Display::fmt(&i, formatter),
             N::Float(f) => Display::fmt(&f, formatter),
         }
     }
@@ -244,9 +252,9 @@ impl Serialize for Number {
         S: Serializer,
     {
         match self.n {
-            N::PosInt(i) => serializer.serialize_u64(i),
-            N::NegInt(i) => serializer.serialize_i64(i),
-            N::Float(f) => serializer.serialize_f64(f),
+            N::Int(i) => serializer.serialize_i64(i),
+            N::UInt(i) => serializer.serialize_u64(i),
+            N::Float(f) => serializer.serialize_f64(f.into()),
         }
     }
 }
@@ -298,9 +306,9 @@ impl<'de> Deserializer<'de> for Number {
         V: Visitor<'de>,
     {
         match self.n {
-            N::PosInt(i) => visitor.visit_u64(i),
-            N::NegInt(i) => visitor.visit_i64(i),
-            N::Float(f) => visitor.visit_f64(f),
+            N::Int(i) => visitor.visit_i64(i),
+            N::UInt(i) => visitor.visit_u64(i),
+            N::Float(f) => visitor.visit_f64(f.into()),
         }
     }
 
@@ -320,9 +328,9 @@ impl<'de, 'a> Deserializer<'de> for &'a Number {
         V: Visitor<'de>,
     {
         match self.n {
-            N::PosInt(i) => visitor.visit_u64(i),
-            N::NegInt(i) => visitor.visit_i64(i),
-            N::Float(f) => visitor.visit_f64(f),
+            N::Int(i) => visitor.visit_i64(i),
+            N::UInt(i) => visitor.visit_u64(i),
+            N::Float(f) => visitor.visit_f64(f.into()),
         }
     }
 
@@ -340,9 +348,9 @@ macro_rules! from_signed {
                 #[inline]
                 fn from(i: $signed_ty) -> Self {
                     if i < 0 {
-                        Number { n: N::NegInt(i as i64) }
+                        Number { n: N::Int(i as i64) }
                     } else {
-                        Number { n: N::PosInt(i as u64) }
+                        Number { n: N::UInt(i as u64) }
                     }
                 }
             }
@@ -356,7 +364,7 @@ macro_rules! from_unsigned {
             impl From<$unsigned_ty> for Number {
                 #[inline]
                 fn from(u: $unsigned_ty) -> Self {
-                    Number { n: N::PosInt(u as u64) }
+                    Number { n: N::UInt(u as u64) }
                 }
             }
         )*
@@ -371,9 +379,9 @@ impl Number {
     #[doc(hidden)]
     pub fn unexpected(&self) -> Unexpected {
         match self.n {
-            N::PosInt(u) => Unexpected::Unsigned(u),
-            N::NegInt(i) => Unexpected::Signed(i),
-            N::Float(f) => Unexpected::Float(f),
+            N::Int(i) => Unexpected::Signed(i),
+            N::UInt(u) => Unexpected::Unsigned(u),
+            N::Float(f) => Unexpected::Float(f.into()),
         }
     }
 }

@@ -25,7 +25,7 @@ pub struct Error {
     err: Box<ErrorImpl>,
 }
 
-/// Alias for a `Result` with the error type `serde_json::Error`.
+/// Alias for a `Result` with the error type `tjson::Error`.
 pub type Result<T> = result::Result<T, Error>;
 
 impl Error {
@@ -112,7 +112,7 @@ impl Error {
     }
 }
 
-/// Categorizes the cause of a `serde_json::Error`.
+/// Categorizes the cause of a `tjson::Error`.
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub enum Category {
     /// The error was caused by a failure to read or write bytes on an IO
@@ -136,7 +136,7 @@ pub enum Category {
 }
 
 impl From<Error> for io::Error {
-    /// Convert a `serde_json::Error` into an `io::Error`.
+    /// Convert a `tjson::Error` into an `io::Error`.
     ///
     /// JSON syntax and data errors are turned into `InvalidData` IO errors.
     /// EOF errors are turned into `UnexpectedEof` IO errors.
@@ -146,12 +146,12 @@ impl From<Error> for io::Error {
     ///
     /// enum MyError {
     ///     Io(io::Error),
-    ///     Json(serde_json::Error),
+    ///     Json(tjson::Error),
     /// }
     ///
-    /// impl From<serde_json::Error> for MyError {
-    ///     fn from(err: serde_json::Error) -> MyError {
-    ///         use serde_json::error::Category;
+    /// impl From<tjson::Error> for MyError {
+    ///     fn from(err: tjson::Error) -> MyError {
+    ///         use tjson::error::Category;
     ///         match err.classify() {
     ///             Category::Io => {
     ///                 MyError::Io(err.into())

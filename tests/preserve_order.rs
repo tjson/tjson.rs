@@ -6,9 +6,9 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-extern crate serde_json;
+extern crate tjson;
 
-use serde_json::{from_str, Value};
+use tjson::{from_str, Value};
 
 #[test]
 fn test_map_order() {
