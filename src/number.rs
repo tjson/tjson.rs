@@ -27,15 +27,18 @@ pub struct Number {
     n: N,
 }
 
-// "N" is a prefix of "NegInt"... this is a false positive.
+// "N" is a prefix of "Int"... this is a false positive.
 // https://github.com/Manishearth/rust-clippy/issues/1241
 #[cfg_attr(feature = "cargo-clippy", allow(enum_variant_names))]
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
 enum N {
-    PosInt(u64),
-    /// Always less than zero.
-    NegInt(i64),
-    /// Always finite.
+    /// Signed integer (not necessarily less than zero).
+    Int(i64),
+
+    /// Unsigned integer		
+    UInt(u64),
+
+    /// Floating point (always finite).
     Float(OrderedFloat<f64>),
 }
 
@@ -68,8 +71,8 @@ impl Number {
     #[inline]
     pub fn is_i64(&self) -> bool {
         match self.n {
-            N::PosInt(v) => v <= i64::MAX as u64,
-            N::NegInt(_) => true,
+            N::UInt(v) => v <= i64::MAX as u64,
+            N::Int(_) => true,
             N::Float(_) => false,
         }
     }
@@ -98,8 +101,8 @@ impl Number {
     #[inline]
     pub fn is_u64(&self) -> bool {
         match self.n {
-            N::PosInt(_) => true,
-            N::NegInt(_) | N::Float(_) => false,
+            N::UInt(_) => true,
+            N::Int(_) | N::Float(_) => false,
         }
     }
 
@@ -129,7 +132,7 @@ impl Number {
     pub fn is_f64(&self) -> bool {
         match self.n {
             N::Float(_) => true,
-            N::PosInt(_) | N::NegInt(_) => false,
+            N::UInt(_) | N::Int(_) => false,
         }
     }
 
@@ -154,8 +157,8 @@ impl Number {
     #[inline]
     pub fn as_i64(&self) -> Option<i64> {
         match self.n {
-            N::PosInt(n) => NumCast::from(n),
-            N::NegInt(n) => Some(n),
+            N::UInt(n) => NumCast::from(n),
+            N::Int(n) => Some(n),
             N::Float(_) => None,
         }
     }
@@ -178,8 +181,8 @@ impl Number {
     #[inline]
     pub fn as_u64(&self) -> Option<u64> {
         match self.n {
-            N::PosInt(n) => Some(n),
-            N::NegInt(n) => NumCast::from(n),
+            N::UInt(n) => Some(n),
+            N::Int(n) => NumCast::from(n),
             N::Float(_) => None,
         }
     }
@@ -201,8 +204,8 @@ impl Number {
     #[inline]
     pub fn as_f64(&self) -> Option<f64> {
         match self.n {
-            N::PosInt(n) => NumCast::from(n),
-            N::NegInt(n) => NumCast::from(n),
+            N::UInt(n) => NumCast::from(n),
+            N::Int(n) => NumCast::from(n),
             N::Float(n) => Some(n.into()),
         }
     }
@@ -232,8 +235,8 @@ impl Number {
 impl fmt::Display for Number {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         match self.n {
-            N::PosInt(i) => Display::fmt(&i, formatter),
-            N::NegInt(i) => Display::fmt(&i, formatter),
+            N::UInt(i) => Display::fmt(&i, formatter),
+            N::Int(i) => Display::fmt(&i, formatter),
             N::Float(f) => Display::fmt(&f, formatter),
         }
     }
@@ -252,8 +255,8 @@ impl Serialize for Number {
         S: Serializer,
     {
         match self.n {
-            N::PosInt(i) => serializer.serialize_u64(i),
-            N::NegInt(i) => serializer.serialize_i64(i),
+            N::UInt(i) => serializer.serialize_u64(i),
+            N::Int(i) => serializer.serialize_i64(i),
             N::Float(f) => serializer.serialize_f64(f.into()),
         }
     }
@@ -306,8 +309,8 @@ impl<'de> Deserializer<'de> for Number {
         V: Visitor<'de>,
     {
         match self.n {
-            N::PosInt(i) => visitor.visit_u64(i),
-            N::NegInt(i) => visitor.visit_i64(i),
+            N::UInt(i) => visitor.visit_u64(i),
+            N::Int(i) => visitor.visit_i64(i),
             N::Float(f) => visitor.visit_f64(f.into()),
         }
     }
@@ -328,8 +331,8 @@ impl<'de, 'a> Deserializer<'de> for &'a Number {
         V: Visitor<'de>,
     {
         match self.n {
-            N::PosInt(i) => visitor.visit_u64(i),
-            N::NegInt(i) => visitor.visit_i64(i),
+            N::UInt(i) => visitor.visit_u64(i),
+            N::Int(i) => visitor.visit_i64(i),
             N::Float(f) => visitor.visit_f64(f.into()),
         }
     }
@@ -348,9 +351,9 @@ macro_rules! from_signed {
                 #[inline]
                 fn from(i: $signed_ty) -> Self {
                     if i < 0 {
-                        Number { n: N::NegInt(i as i64) }
+                        Number { n: N::Int(i as i64) }
                     } else {
-                        Number { n: N::PosInt(i as u64) }
+                        Number { n: N::UInt(i as u64) }
                     }
                 }
             }
@@ -364,7 +367,7 @@ macro_rules! from_unsigned {
             impl From<$unsigned_ty> for Number {
                 #[inline]
                 fn from(u: $unsigned_ty) -> Self {
-                    Number { n: N::PosInt(u as u64) }
+                    Number { n: N::UInt(u as u64) }
                 }
             }
         )*
@@ -379,8 +382,8 @@ impl Number {
     #[doc(hidden)]
     pub fn unexpected(&self) -> Unexpected {
         match self.n {
-            N::PosInt(u) => Unexpected::Unsigned(u),
-            N::NegInt(i) => Unexpected::Signed(i),
+            N::UInt(u) => Unexpected::Unsigned(u),
+            N::Int(i) => Unexpected::Signed(i),
             N::Float(f) => Unexpected::Float(f.into()),
         }
     }
