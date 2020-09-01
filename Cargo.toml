@@ -20,7 +20,7 @@ num-traits = "0.1.32"
 serde = "^1.0"
 
 [dependencies.chrono]
-version = "^0.3.1"
+version = "^0.4.15"
 features = ["serde"]
 
 [dependencies.linked-hash-map]
